@@ -6,11 +6,10 @@
 import SwiftUI
 
 struct PulsePathGridGame: View {
-    let difficulty: Difficulty
-    let currentLevel: Int
-    let onLevelComplete: () -> Void
+    let level: Int
+    let onComplete: (Int, Int) -> Void
     
-    @State private var gridSize = 3
+    @State private var gridSize: Int = 3
     @State private var sequence: [Int] = []
     @State private var playerSequence: [Int] = []
     @State private var isShowingSequence = true
@@ -18,63 +17,115 @@ struct PulsePathGridGame: View {
     @State private var highlightedTile: Int? = nil
     @State private var wrongTile: Int? = nil
     @State private var gameState: GamePlayState = .ready
-    @State private var showInstructions = true
+    @State private var score: Int = 0
+    @State private var round: Int = 1
+    @State private var totalRounds: Int = 3
+    @State private var timeBonus: Int = 100
+    @State private var obstacles: Set<Int> = []
+    @State private var bonusTiles: Set<Int> = []
     
-    private var sequenceLength: Int {
-        switch currentLevel {
-        case 1: return 3
-        case 2: return 4
-        case 3: return 5
-        default: return 3
-        }
+    // Level configuration
+    private var config: LevelConfig {
+        LevelConfig.forLevel(level)
     }
     
-    private var displaySpeed: Double {
-        switch difficulty {
-        case .easy: return 1.0
-        case .normal: return 0.75
-        case .hard: return 0.5
+    struct LevelConfig {
+        let gridSize: Int
+        let sequenceLength: Int
+        let displaySpeed: Double
+        let hasObstacles: Bool
+        let hasBonusTiles: Bool
+        let rounds: Int
+        
+        static func forLevel(_ level: Int) -> LevelConfig {
+            switch level {
+            case 1: return LevelConfig(gridSize: 3, sequenceLength: 3, displaySpeed: 1.0, hasObstacles: false, hasBonusTiles: false, rounds: 2)
+            case 2: return LevelConfig(gridSize: 3, sequenceLength: 4, displaySpeed: 0.9, hasObstacles: false, hasBonusTiles: false, rounds: 2)
+            case 3: return LevelConfig(gridSize: 3, sequenceLength: 4, displaySpeed: 0.8, hasObstacles: false, hasBonusTiles: true, rounds: 3)
+            case 4: return LevelConfig(gridSize: 4, sequenceLength: 4, displaySpeed: 0.8, hasObstacles: false, hasBonusTiles: true, rounds: 3)
+            case 5: return LevelConfig(gridSize: 4, sequenceLength: 5, displaySpeed: 0.75, hasObstacles: true, hasBonusTiles: true, rounds: 3)
+            case 6: return LevelConfig(gridSize: 4, sequenceLength: 5, displaySpeed: 0.7, hasObstacles: true, hasBonusTiles: true, rounds: 3)
+            case 7: return LevelConfig(gridSize: 4, sequenceLength: 6, displaySpeed: 0.65, hasObstacles: true, hasBonusTiles: true, rounds: 4)
+            case 8: return LevelConfig(gridSize: 5, sequenceLength: 5, displaySpeed: 0.65, hasObstacles: true, hasBonusTiles: true, rounds: 4)
+            case 9: return LevelConfig(gridSize: 5, sequenceLength: 6, displaySpeed: 0.6, hasObstacles: true, hasBonusTiles: true, rounds: 4)
+            case 10: return LevelConfig(gridSize: 5, sequenceLength: 7, displaySpeed: 0.55, hasObstacles: true, hasBonusTiles: true, rounds: 5)
+            case 11: return LevelConfig(gridSize: 5, sequenceLength: 8, displaySpeed: 0.5, hasObstacles: true, hasBonusTiles: true, rounds: 5)
+            case 12: return LevelConfig(gridSize: 6, sequenceLength: 8, displaySpeed: 0.45, hasObstacles: true, hasBonusTiles: true, rounds: 5)
+            default: return LevelConfig(gridSize: 3, sequenceLength: 3, displaySpeed: 1.0, hasObstacles: false, hasBonusTiles: false, rounds: 2)
+            }
         }
     }
     
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 24) {
-                Spacer()
-                
-                // Status text
-                VStack(spacing: 8) {
-                    Text(statusText)
-                        .font(.system(size: 20, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white)
+            VStack(spacing: 20) {
+                // Status bar
+                HStack {
+                    // Round indicator
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Round")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundColor(Color("HighlightTone").opacity(0.7))
+                        Text("\(round)/\(totalRounds)")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                    }
                     
-                    if gameState == .playing {
-                        Text("\(playerSequence.count)/\(sequenceLength)")
-                            .font(.system(size: 16, weight: .medium, design: .rounded))
-                            .foregroundColor(Color("HighlightTone"))
+                    Spacer()
+                    
+                    // Score
+                    VStack(spacing: 4) {
+                        Text("Score")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundColor(Color("HighlightTone").opacity(0.7))
+                        Text("\(score)")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(Color("AccentGlow"))
+                    }
+                    
+                    Spacer()
+                    
+                    // Sequence progress
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Progress")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundColor(Color("HighlightTone").opacity(0.7))
+                        Text("\(playerSequence.count)/\(sequence.count)")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
                     }
                 }
-                .frame(height: 60)
+                .padding(.horizontal, 24)
+                
+                // Status text
+                Text(statusText)
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .foregroundColor(.white)
+                    .frame(height: 30)
+                
+                Spacer()
                 
                 // Grid
-                let tileSize = min((geometry.size.width - 80) / CGFloat(gridSize), 100.0)
+                let tileSize = min((geometry.size.width - 60) / CGFloat(gridSize), 80.0)
                 
                 LazyVGrid(
-                    columns: Array(repeating: GridItem(.fixed(tileSize), spacing: 12), count: gridSize),
-                    spacing: 12
+                    columns: Array(repeating: GridItem(.fixed(tileSize), spacing: 8), count: gridSize),
+                    spacing: 8
                 ) {
                     ForEach(0..<(gridSize * gridSize), id: \.self) { index in
-                        TileView(
+                        PulseTileView(
                             index: index,
                             isHighlighted: highlightedTile == index,
                             isWrong: wrongTile == index,
                             isInPlayerSequence: playerSequence.contains(index),
+                            isObstacle: obstacles.contains(index),
+                            isBonus: bonusTiles.contains(index),
                             size: tileSize,
                             onTap: {
                                 handleTileTap(index)
                             }
                         )
-                        .disabled(gameState != .playing)
+                        .disabled(gameState != .playing || obstacles.contains(index))
                     }
                 }
                 .padding(.horizontal, 20)
@@ -84,65 +135,89 @@ struct PulsePathGridGame: View {
                 // Action button
                 if gameState == .ready || gameState == .failed {
                     GlowingButton(title: gameState == .ready ? "Start" : "Try Again") {
-                        startGame()
+                        startRound()
                     }
                     .padding(.horizontal, 40)
-                    .padding(.bottom, 40)
-                }
-                
-                if showInstructions && gameState == .ready {
-                    Text("Watch the glowing tiles, then repeat the pattern")
-                        .font(.system(size: 14, weight: .regular, design: .rounded))
-                        .foregroundColor(Color("HighlightTone").opacity(0.7))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-                        .padding(.bottom, 20)
+                    .padding(.bottom, 30)
                 }
             }
         }
         .onAppear {
-            setupGame()
+            setupLevel()
         }
     }
     
     private var statusText: String {
         switch gameState {
         case .ready:
-            return "Ready?"
+            return "Ready for Round \(round)?"
         case .showing:
-            return "Watch carefully..."
+            return "Watch the pattern..."
         case .playing:
             return "Repeat the pattern"
         case .success:
             return "Perfect!"
         case .failed:
-            return "Wrong sequence"
+            return "Wrong tile!"
         }
     }
     
-    private func setupGame() {
-        gridSize = 3
+    private func setupLevel() {
+        gridSize = config.gridSize
+        totalRounds = config.rounds
+        round = 1
+        score = 0
         gameState = .ready
         sequence = []
         playerSequence = []
         highlightedTile = nil
         wrongTile = nil
+        setupObstaclesAndBonuses()
     }
     
-    private func startGame() {
-        showInstructions = false
+    private func setupObstaclesAndBonuses() {
+        obstacles.removeAll()
+        bonusTiles.removeAll()
+        
+        let totalTiles = gridSize * gridSize
+        
+        if config.hasObstacles {
+            // Add 1-2 obstacles
+            let obstacleCount = level > 8 ? 2 : 1
+            while obstacles.count < obstacleCount {
+                let randomTile = Int.random(in: 0..<totalTiles)
+                obstacles.insert(randomTile)
+            }
+        }
+        
+        if config.hasBonusTiles {
+            // Add 1-2 bonus tiles
+            let bonusCount = level > 6 ? 2 : 1
+            while bonusTiles.count < bonusCount {
+                let randomTile = Int.random(in: 0..<totalTiles)
+                if !obstacles.contains(randomTile) {
+                    bonusTiles.insert(randomTile)
+                }
+            }
+        }
+    }
+    
+    private func startRound() {
         gameState = .showing
         playerSequence = []
         wrongTile = nil
+        timeBonus = 100
         generateSequence()
         showSequence()
     }
     
     private func generateSequence() {
         sequence = []
-        var availableTiles = Array(0..<(gridSize * gridSize))
+        var availableTiles = Array(0..<(gridSize * gridSize)).filter { !obstacles.contains($0) }
         
-        for _ in 0..<sequenceLength {
+        let length = config.sequenceLength + (round - 1) // Increase sequence each round
+        
+        for _ in 0..<length {
             if let randomIndex = availableTiles.randomElement() {
                 sequence.append(randomIndex)
                 availableTiles.removeAll { $0 == randomIndex }
@@ -157,25 +232,19 @@ struct PulsePathGridGame: View {
     
     private func showNextInSequence() {
         guard currentShowIndex < sequence.count else {
-            // Finished showing sequence
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 gameState = .playing
             }
             return
         }
         
         let tile = sequence[currentShowIndex]
+        highlightedTile = tile
         
-        withAnimation(.easeInOut(duration: 0.2)) {
-            highlightedTile = tile
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + displaySpeed * 0.6) {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                highlightedTile = nil
-            }
+        DispatchQueue.main.asyncAfter(deadline: .now() + config.displaySpeed * 0.6) {
+            highlightedTile = nil
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + displaySpeed * 0.4) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + config.displaySpeed * 0.3) {
                 currentShowIndex += 1
                 showNextInSequence()
             }
@@ -188,106 +257,146 @@ struct PulsePathGridGame: View {
         let expectedTile = sequence[playerSequence.count]
         
         if index == expectedTile {
-            // Correct tap
-            withAnimation(.spring(response: 0.2)) {
-                playerSequence.append(index)
-                highlightedTile = index
+            playerSequence.append(index)
+            highlightedTile = index
+            
+            // Bonus points for bonus tiles
+            if bonusTiles.contains(index) {
+                score += 25
             }
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                withAnimation {
-                    highlightedTile = nil
-                }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                highlightedTile = nil
             }
             
             if playerSequence.count == sequence.count {
-                // Level complete
+                // Round complete
+                score += 50 + timeBonus
                 gameState = .success
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                    onLevelComplete()
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    if round < totalRounds {
+                        round += 1
+                        setupObstaclesAndBonuses()
+                        gameState = .ready
+                    } else {
+                        // Level complete
+                        let stars = calculateStars()
+                        onComplete(score, stars)
+                    }
                 }
             }
         } else {
-            // Wrong tap
             gameState = .failed
-            withAnimation(.spring(response: 0.2)) {
-                wrongTile = index
-            }
+            wrongTile = index
+            score = max(0, score - 20)
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 wrongTile = nil
             }
         }
     }
+    
+    private func calculateStars() -> Int {
+        let maxPossibleScore = totalRounds * (50 + 100) + (totalRounds * 25 * 2) // Base + time bonus + potential bonus tiles
+        let percentage = Double(score) / Double(maxPossibleScore)
+        
+        if percentage >= 0.8 { return 3 }
+        if percentage >= 0.5 { return 2 }
+        return 1
+    }
 }
 
-struct TileView: View {
+struct PulseTileView: View {
     let index: Int
     let isHighlighted: Bool
     let isWrong: Bool
     let isInPlayerSequence: Bool
+    let isObstacle: Bool
+    let isBonus: Bool
     let size: CGFloat
     let onTap: () -> Void
-    
-    @State private var pulseAnimation = false
     
     var body: some View {
         Button(action: onTap) {
             ZStack {
                 // Base tile
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 10)
                     .fill(tileColor)
                     .frame(width: size, height: size)
                 
                 // Glow effect when highlighted
                 if isHighlighted {
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 10)
                         .fill(Color("AccentGlow"))
                         .frame(width: size, height: size)
-                        .blur(radius: 8)
-                        .opacity(0.6)
+                        .blur(radius: 6)
+                        .opacity(0.5)
                     
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 10)
                         .fill(Color("AccentGlow"))
                         .frame(width: size, height: size)
                 }
                 
                 // Wrong indicator
                 if isWrong {
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 10)
                         .fill(Color.red)
                         .frame(width: size, height: size)
                     
                     Image(systemName: "xmark")
-                        .font(.system(size: size * 0.4, weight: .bold))
+                        .font(.system(size: size * 0.35, weight: .bold))
                         .foregroundColor(.white)
                 }
                 
+                // Obstacle indicator
+                if isObstacle {
+                    Image(systemName: "xmark")
+                        .font(.system(size: size * 0.3, weight: .medium))
+                        .foregroundColor(Color.gray.opacity(0.5))
+                }
+                
+                // Bonus indicator
+                if isBonus && !isHighlighted && !isInPlayerSequence {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: size * 0.25))
+                        .foregroundColor(Color("HighlightTone").opacity(0.6))
+                }
+                
                 // Border
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(
-                        isHighlighted ? Color("AccentGlow") :
-                        isInPlayerSequence ? Color("HighlightTone").opacity(0.5) :
-                        Color.white.opacity(0.2),
-                        lineWidth: isHighlighted ? 3 : 1.5
-                    )
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(borderColor, lineWidth: isHighlighted ? 2 : 1)
                     .frame(width: size, height: size)
             }
         }
         .buttonStyle(PlainButtonStyle())
-        .scaleEffect(isHighlighted ? 1.05 : 1.0)
-        .animation(.spring(response: 0.2), value: isHighlighted)
     }
     
     private var tileColor: Color {
-        if isHighlighted {
+        if isObstacle {
+            return Color.gray.opacity(0.15)
+        } else if isHighlighted {
             return Color("AccentGlow")
         } else if isWrong {
             return Color.red
         } else if isInPlayerSequence {
             return Color("HighlightTone").opacity(0.3)
+        } else if isBonus {
+            return Color("HighlightTone").opacity(0.1)
         } else {
             return Color.white.opacity(0.08)
+        }
+    }
+    
+    private var borderColor: Color {
+        if isObstacle {
+            return Color.gray.opacity(0.3)
+        } else if isHighlighted {
+            return Color("AccentGlow")
+        } else if isBonus {
+            return Color("HighlightTone").opacity(0.4)
+        } else {
+            return Color.white.opacity(0.2)
         }
     }
 }
@@ -305,12 +414,6 @@ enum GamePlayState {
         Color("PrimaryBackground")
             .ignoresSafeArea()
         
-        PulsePathGridGame(
-            difficulty: .easy,
-            currentLevel: 1,
-            onLevelComplete: {}
-        )
+        PulsePathGridGame(level: 5, onComplete: { _, _ in })
     }
 }
-
-

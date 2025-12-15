@@ -17,42 +17,98 @@ struct HomeView: View {
                 Color("PrimaryBackground")
                     .ignoresSafeArea()
                 
+                // Background glow
+                GeometryReader { geometry in
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color("AccentGlow").opacity(0.15),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: geometry.size.width * 0.6
+                            )
+                        )
+                        .frame(width: geometry.size.width, height: geometry.size.width)
+                        .offset(x: geometry.size.width * 0.2, y: -geometry.size.height * 0.1)
+                }
+                
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 24) {
-                        // Header with shard counter
+                    VStack(spacing: 20) {
+                        // Header
                         HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Shifting Horizons")
+                                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
+                                
+                                Text("Choose your challenge")
+                                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                                    .foregroundColor(Color("HighlightTone").opacity(0.7))
+                            }
+                            
                             Spacer()
-                            ShardCounter(count: appState.shards)
+                            
+                            // Shard counter
+                            HStack(spacing: 6) {
+                                Image(systemName: "diamond.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(Color("HighlightTone"))
+                                Text("\(appState.shards)")
+                                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.1))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color("HighlightTone").opacity(0.3), lineWidth: 1)
+                                    )
+                            )
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 16)
                         
-                        // Hero section
-                        VStack(spacing: 12) {
-                            Text("Shifting Horizons")
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                            
-                            Text("Choose your challenge")
-                                .font(.system(size: 16, weight: .medium, design: .rounded))
-                                .foregroundColor(Color("HighlightTone").opacity(0.8))
-                        }
-                        .padding(.top, 20)
+                        // Progress summary
+                        ProgressSummaryCard(
+                            totalLevels: appState.totalCompletedLevels,
+                            totalStars: appState.totalStars,
+                            maxLevels: GameType.allCases.count * 12,
+                            maxStars: GameType.allCases.count * 12 * 3
+                        )
+                        .padding(.horizontal, 20)
                         
-                        // Game cards
-                        VStack(spacing: 16) {
+                        // Games section
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Mini-Games")
+                                .font(.system(size: 20, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 20)
+                            
                             ForEach(GameType.allCases, id: \.self) { gameType in
-                                GameCard(gameType: gameType) {
-                                    selectedGame = gameType
+                                GameCardNew(
+                                    gameType: gameType,
+                                    progress: appState.progress(for: gameType),
+                                    isUnlocked: appState.isGameUnlocked(gameType),
+                                    unlockRequirement: gameType.unlockRequirement
+                                ) {
+                                    if appState.isGameUnlocked(gameType) {
+                                        selectedGame = gameType
+                                    }
                                 }
+                                .padding(.horizontal, 20)
                             }
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 16)
+                        .padding(.top, 8)
                         
                         // Bottom buttons
                         VStack(spacing: 12) {
-                            GlowingButton(title: "Progress Stats", action: {
+                            GlowingButton(title: "Statistics", action: {
                                 showStats = true
                             }, isSecondary: true)
                             
@@ -61,14 +117,14 @@ struct HomeView: View {
                             }, isSecondary: true)
                         }
                         .padding(.horizontal, 20)
-                        .padding(.top, 24)
+                        .padding(.top, 16)
                         .padding(.bottom, 40)
                     }
                 }
             }
             .navigationBarHidden(true)
-            .sheet(item: $selectedGame) { gameType in
-                DifficultySelectionView(gameType: gameType)
+            .fullScreenCover(item: $selectedGame) { gameType in
+                LevelMapView(gameType: gameType)
                     .environmentObject(appState)
             }
             .fullScreenCover(isPresented: $showStats) {
@@ -87,180 +143,184 @@ extension GameType: Identifiable {
     var id: String { rawValue }
 }
 
-struct DifficultySelectionView: View {
-    @EnvironmentObject var appState: AppState
-    @Environment(\.dismiss) var dismiss
-    let gameType: GameType
-    
-    @State private var selectedDifficulty: Difficulty?
+struct ProgressSummaryCard: View {
+    let totalLevels: Int
+    let totalStars: Int
+    let maxLevels: Int
+    let maxStars: Int
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color("PrimaryBackground")
-                    .ignoresSafeArea()
-                
-                // Subtle background glow
-                GeometryReader { geometry in
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    Color("AccentGlow").opacity(0.2),
-                                    Color.clear
-                                ],
-                                center: .center,
-                                startRadius: 0,
-                                endRadius: geometry.size.width * 0.5
-                            )
-                        )
-                        .frame(width: geometry.size.width, height: geometry.size.width)
-                        .offset(y: -geometry.size.height * 0.2)
+        HStack(spacing: 24) {
+            // Levels
+            VStack(spacing: 6) {
+                HStack(spacing: 4) {
+                    Image(systemName: "flag.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(Color("AccentGlow"))
+                    Text("\(totalLevels)")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
                 }
-                
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 32) {
-                        // Header
-                        VStack(spacing: 16) {
-                            ZStack {
-                                Circle()
-                                    .fill(
-                                        RadialGradient(
-                                            colors: [
-                                                Color("AccentGlow").opacity(0.3),
-                                                Color.clear
-                                            ],
-                                            center: .center,
-                                            startRadius: 0,
-                                            endRadius: 50
-                                        )
-                                    )
-                                    .frame(width: 100, height: 100)
-                                
-                                Image(systemName: gameType.icon)
-                                    .font(.system(size: 44, weight: .medium))
-                                    .foregroundColor(Color("AccentGlow"))
-                            }
-                            
-                            Text(gameType.rawValue)
-                                .font(.system(size: 26, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                            
-                            Text(gameType.description)
-                                .font(.system(size: 15, weight: .regular, design: .rounded))
-                                .foregroundColor(Color("HighlightTone").opacity(0.8))
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 32)
-                        }
-                        .padding(.top, 40)
-                        
-                        // Difficulty selection
-                        VStack(spacing: 16) {
-                            Text("Select Difficulty")
-                                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                                .foregroundColor(.white)
-                            
-                            ForEach(Difficulty.allCases, id: \.self) { difficulty in
-                                DifficultyCard(
-                                    difficulty: difficulty,
-                                    progress: appState.progress(for: gameType).progress(for: difficulty)
-                                ) {
-                                    selectedDifficulty = difficulty
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        
-                        Spacer(minLength: 40)
-                    }
-                }
+                Text("Levels")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundColor(Color("HighlightTone").opacity(0.7))
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 28))
-                            .foregroundColor(Color("HighlightTone").opacity(0.6))
-                    }
+            
+            Divider()
+                .frame(height: 40)
+                .background(Color.white.opacity(0.2))
+            
+            // Stars
+            VStack(spacing: 6) {
+                HStack(spacing: 4) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(Color("HighlightTone"))
+                    Text("\(totalStars)")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
                 }
+                Text("Stars")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundColor(Color("HighlightTone").opacity(0.7))
             }
-            .fullScreenCover(item: $selectedDifficulty) { difficulty in
-                GameContainerView(gameType: gameType, difficulty: difficulty)
-                    .environmentObject(appState)
+            
+            Divider()
+                .frame(height: 40)
+                .background(Color.white.opacity(0.2))
+            
+            // Games unlocked
+            VStack(spacing: 6) {
+                let unlockedGames = GameType.allCases.filter { totalLevels >= $0.unlockRequirement }.count
+                HStack(spacing: 4) {
+                    Image(systemName: "gamecontroller.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(Color.purple)
+                    Text("\(unlockedGames)")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                }
+                Text("Games")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundColor(Color("HighlightTone").opacity(0.7))
             }
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
     }
 }
 
-extension Difficulty: Identifiable {
-    var id: String { rawValue }
-}
-
-struct DifficultyCard: View {
-    let difficulty: Difficulty
-    let progress: LevelProgress
+struct GameCardNew: View {
+    let gameType: GameType
+    let progress: GameProgressData
+    let isUnlocked: Bool
+    let unlockRequirement: Int
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
             HStack(spacing: 16) {
-                // Difficulty indicator
+                // Icon
                 ZStack {
                     Circle()
-                        .fill(difficulty.color.opacity(0.2))
-                        .frame(width: 50, height: 50)
+                        .fill(
+                            isUnlocked ?
+                            gameType.themeColor.opacity(0.2) :
+                            Color.gray.opacity(0.2)
+                        )
+                        .frame(width: 60, height: 60)
                     
-                    Circle()
-                        .stroke(difficulty.color, lineWidth: 2)
-                        .frame(width: 50, height: 50)
-                    
-                    Text(String(difficulty.shardReward))
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundColor(difficulty.color)
+                    if isUnlocked {
+                        Image(systemName: gameType.icon)
+                            .font(.system(size: 26))
+                            .foregroundColor(gameType.themeColor)
+                    } else {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 22))
+                            .foregroundColor(Color.gray.opacity(0.5))
+                    }
                 }
                 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(difficulty.rawValue)
-                        .font(.system(size: 18, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white)
+                // Info
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(gameType.rawValue)
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .foregroundColor(isUnlocked ? .white : Color.gray)
                     
-                    Text("\(progress.completedCount)/3 levels completed")
-                        .font(.system(size: 13, weight: .regular, design: .rounded))
-                        .foregroundColor(Color("HighlightTone").opacity(0.7))
+                    if isUnlocked {
+                        HStack(spacing: 12) {
+                            // Levels
+                            HStack(spacing: 4) {
+                                Image(systemName: "flag.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(gameType.themeColor.opacity(0.7))
+                                Text("\(progress.completedLevelsCount)/12")
+                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                    .foregroundColor(Color("HighlightTone").opacity(0.7))
+                            }
+                            
+                            // Stars
+                            HStack(spacing: 4) {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(Color("HighlightTone").opacity(0.7))
+                                Text("\(progress.totalStars)/36")
+                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                    .foregroundColor(Color("HighlightTone").opacity(0.7))
+                            }
+                        }
+                    } else {
+                        Text("Complete \(unlockRequirement) levels to unlock")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundColor(Color.gray.opacity(0.6))
+                    }
                 }
                 
                 Spacer()
                 
-                // Progress indicators
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(progress.level1Completed ? difficulty.color : Color.white.opacity(0.2))
-                        .frame(width: 10, height: 10)
-                    Circle()
-                        .fill(progress.level2Completed ? difficulty.color : Color.white.opacity(0.2))
-                        .frame(width: 10, height: 10)
-                    Circle()
-                        .fill(progress.level3Completed ? difficulty.color : Color.white.opacity(0.2))
-                        .frame(width: 10, height: 10)
+                // Progress indicator or chevron
+                if isUnlocked {
+                    // Mini progress bar
+                    VStack(spacing: 4) {
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.white.opacity(0.1))
+                                .frame(width: 50, height: 6)
+                            
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(gameType.themeColor)
+                                .frame(width: 50 * CGFloat(progress.completedLevelsCount) / 12, height: 6)
+                        }
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(Color("HighlightTone").opacity(0.5))
+                    }
                 }
-                
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(Color("HighlightTone").opacity(0.5))
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 18)
+            .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color.white.opacity(0.05))
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
-                            .stroke(difficulty.color.opacity(0.3), lineWidth: 1)
+                            .stroke(
+                                isUnlocked ? gameType.themeColor.opacity(0.3) : Color.gray.opacity(0.2),
+                                lineWidth: 1
+                            )
                     )
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(!isUnlocked)
     }
 }
 

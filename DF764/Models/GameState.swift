@@ -6,40 +6,21 @@
 import SwiftUI
 import Combine
 
-// MARK: - Difficulty Enum
-enum Difficulty: String, CaseIterable, Codable {
-    case easy = "Easy"
-    case normal = "Normal"
-    case hard = "Hard"
-    
-    var shardReward: Int {
-        switch self {
-        case .easy: return 1
-        case .normal: return 2
-        case .hard: return 3
-        }
-    }
-    
-    var color: Color {
-        switch self {
-        case .easy: return Color("HighlightTone")
-        case .normal: return Color("AccentGlow")
-        case .hard: return Color.red.opacity(0.8)
-        }
-    }
-}
-
 // MARK: - Game Type Enum
 enum GameType: String, CaseIterable, Codable {
     case pulsePathGrid = "Pulse Path Grid"
     case momentumShiftArena = "Momentum Shift Arena"
     case echoSequenceLabyrinth = "Echo Sequence Labyrinth"
+    case gravityFlux = "Gravity Flux"
+    case chronoCascade = "Chrono Cascade"
     
     var icon: String {
         switch self {
         case .pulsePathGrid: return "square.grid.3x3.fill"
         case .momentumShiftArena: return "arrow.left.arrow.right"
         case .echoSequenceLabyrinth: return "point.topleft.down.to.point.bottomright.curvepath.fill"
+        case .gravityFlux: return "circle.dotted"
+        case .chronoCascade: return "timer"
         }
     }
     
@@ -48,45 +29,77 @@ enum GameType: String, CaseIterable, Codable {
         case .pulsePathGrid: return "Follow the glowing path sequence"
         case .momentumShiftArena: return "Redirect sliding objects with precision"
         case .echoSequenceLabyrinth: return "Trace the path through the digital maze"
+        case .gravityFlux: return "Control gravity to guide the orb"
+        case .chronoCascade: return "Chain taps in perfect timing"
         }
+    }
+    
+    var themeColor: Color {
+        switch self {
+        case .pulsePathGrid: return Color("AccentGlow")
+        case .momentumShiftArena: return Color("HighlightTone")
+        case .echoSequenceLabyrinth: return Color.cyan
+        case .gravityFlux: return Color.purple
+        case .chronoCascade: return Color.mint
+        }
+    }
+    
+    var totalLevels: Int {
+        return 12 // Each game has 12 levels
+    }
+    
+    var unlockRequirement: Int {
+        return 0 // All games unlocked from start
     }
 }
 
-// MARK: - Level Progress
-struct LevelProgress: Codable, Equatable {
-    var level1Completed: Bool = false
-    var level2Completed: Bool = false
-    var level3Completed: Bool = false
+// MARK: - Level Data
+struct LevelData: Codable, Equatable, Identifiable {
+    let id: Int
+    var isCompleted: Bool = false
+    var bestScore: Int = 0
+    var stars: Int = 0 // 0-3 stars based on performance
     
-    var completedCount: Int {
-        [level1Completed, level2Completed, level3Completed].filter { $0 }.count
+    var isUnlocked: Bool {
+        return id == 1 // First level always unlocked, others depend on previous
     }
 }
 
 // MARK: - Game Progress
-struct GameProgress: Codable, Equatable {
-    var easy: LevelProgress = LevelProgress()
-    var normal: LevelProgress = LevelProgress()
-    var hard: LevelProgress = LevelProgress()
+struct GameProgressData: Codable, Equatable {
+    var levels: [LevelData]
+    var highestUnlockedLevel: Int = 1
     
-    func progress(for difficulty: Difficulty) -> LevelProgress {
-        switch difficulty {
-        case .easy: return easy
-        case .normal: return normal
-        case .hard: return hard
+    init(totalLevels: Int = 12) {
+        self.levels = (1...totalLevels).map { LevelData(id: $0) }
+    }
+    
+    var completedLevelsCount: Int {
+        levels.filter { $0.isCompleted }.count
+    }
+    
+    var totalStars: Int {
+        levels.reduce(0) { $0 + $1.stars }
+    }
+    
+    mutating func completeLevel(_ levelId: Int, score: Int, stars: Int) {
+        if let index = levels.firstIndex(where: { $0.id == levelId }) {
+            levels[index].isCompleted = true
+            if score > levels[index].bestScore {
+                levels[index].bestScore = score
+            }
+            if stars > levels[index].stars {
+                levels[index].stars = stars
+            }
+            // Unlock next level
+            if levelId < levels.count {
+                highestUnlockedLevel = max(highestUnlockedLevel, levelId + 1)
+            }
         }
     }
     
-    mutating func setProgress(for difficulty: Difficulty, progress: LevelProgress) {
-        switch difficulty {
-        case .easy: easy = progress
-        case .normal: normal = progress
-        case .hard: hard = progress
-        }
-    }
-    
-    var totalLevelsCompleted: Int {
-        easy.completedCount + normal.completedCount + hard.completedCount
+    func isLevelUnlocked(_ levelId: Int) -> Bool {
+        return levelId <= highestUnlockedLevel
     }
 }
 
@@ -104,19 +117,7 @@ class AppState: ObservableObject {
         }
     }
     
-    @Published var pulsePathGridProgress: GameProgress {
-        didSet {
-            saveProgress()
-        }
-    }
-    
-    @Published var momentumShiftArenaProgress: GameProgress {
-        didSet {
-            saveProgress()
-        }
-    }
-    
-    @Published var echoSequenceLabyrinthProgress: GameProgress {
+    @Published var gameProgress: [GameType: GameProgressData] = [:] {
         didSet {
             saveProgress()
         }
@@ -126,94 +127,61 @@ class AppState: ObservableObject {
         self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
         self.shards = UserDefaults.standard.integer(forKey: "shards")
         
-        if let data = UserDefaults.standard.data(forKey: "pulsePathGridProgress"),
-           let progress = try? JSONDecoder().decode(GameProgress.self, from: data) {
-            self.pulsePathGridProgress = progress
-        } else {
-            self.pulsePathGridProgress = GameProgress()
-        }
-        
-        if let data = UserDefaults.standard.data(forKey: "momentumShiftArenaProgress"),
-           let progress = try? JSONDecoder().decode(GameProgress.self, from: data) {
-            self.momentumShiftArenaProgress = progress
-        } else {
-            self.momentumShiftArenaProgress = GameProgress()
-        }
-        
-        if let data = UserDefaults.standard.data(forKey: "echoSequenceLabyrinthProgress"),
-           let progress = try? JSONDecoder().decode(GameProgress.self, from: data) {
-            self.echoSequenceLabyrinthProgress = progress
-        } else {
-            self.echoSequenceLabyrinthProgress = GameProgress()
+        // Load progress for each game
+        for gameType in GameType.allCases {
+            let key = "progress_\(gameType.rawValue)"
+            if let data = UserDefaults.standard.data(forKey: key),
+               let progress = try? JSONDecoder().decode(GameProgressData.self, from: data) {
+                self.gameProgress[gameType] = progress
+            } else {
+                self.gameProgress[gameType] = GameProgressData(totalLevels: gameType.totalLevels)
+            }
         }
     }
     
-    func progress(for gameType: GameType) -> GameProgress {
-        switch gameType {
-        case .pulsePathGrid: return pulsePathGridProgress
-        case .momentumShiftArena: return momentumShiftArenaProgress
-        case .echoSequenceLabyrinth: return echoSequenceLabyrinthProgress
+    func progress(for gameType: GameType) -> GameProgressData {
+        return gameProgress[gameType] ?? GameProgressData(totalLevels: gameType.totalLevels)
+    }
+    
+    func completeLevel(gameType: GameType, level: Int, score: Int, stars: Int) {
+        var progress = gameProgress[gameType] ?? GameProgressData(totalLevels: gameType.totalLevels)
+        let wasCompleted = progress.levels.first(where: { $0.id == level })?.isCompleted ?? false
+        
+        progress.completeLevel(level, score: score, stars: stars)
+        gameProgress[gameType] = progress
+        
+        // Award shards for first completion
+        if !wasCompleted {
+            shards += stars + 1 // 1-4 shards based on stars
         }
     }
     
-    func setProgress(for gameType: GameType, progress: GameProgress) {
-        switch gameType {
-        case .pulsePathGrid: pulsePathGridProgress = progress
-        case .momentumShiftArena: momentumShiftArenaProgress = progress
-        case .echoSequenceLabyrinth: echoSequenceLabyrinthProgress = progress
-        }
+    func isGameUnlocked(_ gameType: GameType) -> Bool {
+        return totalCompletedLevels >= gameType.unlockRequirement
     }
     
-    func completeLevel(gameType: GameType, difficulty: Difficulty, level: Int) {
-        var gameProgress = progress(for: gameType)
-        var levelProgress = gameProgress.progress(for: difficulty)
-        
-        var alreadyCompleted = false
-        switch level {
-        case 1:
-            alreadyCompleted = levelProgress.level1Completed
-            levelProgress.level1Completed = true
-        case 2:
-            alreadyCompleted = levelProgress.level2Completed
-            levelProgress.level2Completed = true
-        case 3:
-            alreadyCompleted = levelProgress.level3Completed
-            levelProgress.level3Completed = true
-        default: break
-        }
-        
-        gameProgress.setProgress(for: difficulty, progress: levelProgress)
-        setProgress(for: gameType, progress: gameProgress)
-        
-        if !alreadyCompleted {
-            shards += difficulty.shardReward
-        }
+    var totalCompletedLevels: Int {
+        gameProgress.values.reduce(0) { $0 + $1.completedLevelsCount }
+    }
+    
+    var totalStars: Int {
+        gameProgress.values.reduce(0) { $0 + $1.totalStars }
     }
     
     func resetProgress() {
         shards = 0
-        pulsePathGridProgress = GameProgress()
-        momentumShiftArenaProgress = GameProgress()
-        echoSequenceLabyrinthProgress = GameProgress()
+        for gameType in GameType.allCases {
+            gameProgress[gameType] = GameProgressData(totalLevels: gameType.totalLevels)
+        }
         saveProgress()
     }
     
     private func saveProgress() {
-        if let data = try? JSONEncoder().encode(pulsePathGridProgress) {
-            UserDefaults.standard.set(data, forKey: "pulsePathGridProgress")
+        for (gameType, progress) in gameProgress {
+            let key = "progress_\(gameType.rawValue)"
+            if let data = try? JSONEncoder().encode(progress) {
+                UserDefaults.standard.set(data, forKey: key)
+            }
         }
-        if let data = try? JSONEncoder().encode(momentumShiftArenaProgress) {
-            UserDefaults.standard.set(data, forKey: "momentumShiftArenaProgress")
-        }
-        if let data = try? JSONEncoder().encode(echoSequenceLabyrinthProgress) {
-            UserDefaults.standard.set(data, forKey: "echoSequenceLabyrinthProgress")
-        }
-    }
-    
-    var totalLevelsCompleted: Int {
-        pulsePathGridProgress.totalLevelsCompleted +
-        momentumShiftArenaProgress.totalLevelsCompleted +
-        echoSequenceLabyrinthProgress.totalLevelsCompleted
     }
 }
-

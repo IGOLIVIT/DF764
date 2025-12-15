@@ -7,43 +7,49 @@ import SwiftUI
 import Combine
 
 struct EchoSequenceLabyrinthGame: View {
-    let difficulty: Difficulty
-    let currentLevel: Int
-    let onLevelComplete: () -> Void
+    let level: Int
+    let onComplete: (Int, Int) -> Void
     
     @State private var gameState: GamePlayState = .ready
     @State private var maze: [[MazeCell]] = []
     @State private var startPoint: CGPoint = .zero
     @State private var endPoint: CGPoint = .zero
     @State private var currentPath: [CGPoint] = []
-    @State private var correctPath: [CGPoint] = []
+    @State private var collectibles: [CGPoint] = []
+    @State private var collectedItems: Set<String> = []
     @State private var timeRemaining: Double = 0
-    @State private var showInstructions = true
-    @State private var isDrawing = false
-    @State private var pathProgress: CGFloat = 0
+    @State private var score: Int = 0
+    @State private var revealedCells: Set<String> = []
+    @State private var hasFog: Bool = false
     
-    private var mazeSize: Int {
-        switch currentLevel {
-        case 1: return 5
-        case 2: return 6
-        case 3: return 7
-        default: return 5
-        }
+    private var config: LevelConfig {
+        LevelConfig.forLevel(level)
     }
     
-    private var timeLimit: Double {
-        let baseTime: Double
-        switch currentLevel {
-        case 1: baseTime = 20
-        case 2: baseTime = 25
-        case 3: baseTime = 30
-        default: baseTime = 20
-        }
+    struct LevelConfig {
+        let mazeSize: Int
+        let timeLimit: Double
+        let collectibleCount: Int
+        let hasFog: Bool
+        let fogRadius: Int
+        let hasMovingObstacles: Bool
         
-        switch difficulty {
-        case .easy: return baseTime * 1.5
-        case .normal: return baseTime
-        case .hard: return baseTime * 0.7
+        static func forLevel(_ level: Int) -> LevelConfig {
+            switch level {
+            case 1: return LevelConfig(mazeSize: 5, timeLimit: 30, collectibleCount: 0, hasFog: false, fogRadius: 0, hasMovingObstacles: false)
+            case 2: return LevelConfig(mazeSize: 5, timeLimit: 28, collectibleCount: 2, hasFog: false, fogRadius: 0, hasMovingObstacles: false)
+            case 3: return LevelConfig(mazeSize: 6, timeLimit: 30, collectibleCount: 2, hasFog: false, fogRadius: 0, hasMovingObstacles: false)
+            case 4: return LevelConfig(mazeSize: 6, timeLimit: 35, collectibleCount: 3, hasFog: true, fogRadius: 2, hasMovingObstacles: false)
+            case 5: return LevelConfig(mazeSize: 7, timeLimit: 40, collectibleCount: 3, hasFog: true, fogRadius: 2, hasMovingObstacles: false)
+            case 6: return LevelConfig(mazeSize: 7, timeLimit: 40, collectibleCount: 4, hasFog: true, fogRadius: 2, hasMovingObstacles: false)
+            case 7: return LevelConfig(mazeSize: 8, timeLimit: 45, collectibleCount: 4, hasFog: true, fogRadius: 2, hasMovingObstacles: true)
+            case 8: return LevelConfig(mazeSize: 8, timeLimit: 45, collectibleCount: 5, hasFog: true, fogRadius: 1, hasMovingObstacles: true)
+            case 9: return LevelConfig(mazeSize: 9, timeLimit: 50, collectibleCount: 5, hasFog: true, fogRadius: 1, hasMovingObstacles: true)
+            case 10: return LevelConfig(mazeSize: 9, timeLimit: 50, collectibleCount: 6, hasFog: true, fogRadius: 1, hasMovingObstacles: true)
+            case 11: return LevelConfig(mazeSize: 10, timeLimit: 55, collectibleCount: 6, hasFog: true, fogRadius: 1, hasMovingObstacles: true)
+            case 12: return LevelConfig(mazeSize: 10, timeLimit: 60, collectibleCount: 8, hasFog: true, fogRadius: 1, hasMovingObstacles: true)
+            default: return LevelConfig(mazeSize: 5, timeLimit: 30, collectibleCount: 0, hasFog: false, fogRadius: 0, hasMovingObstacles: false)
+            }
         }
     }
     
@@ -51,56 +57,87 @@ struct EchoSequenceLabyrinthGame: View {
     
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 20) {
-                // Timer
-                VStack(spacing: 8) {
-                    Text("Time Remaining")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundColor(Color("HighlightTone").opacity(0.7))
-                    
-                    Text(String(format: "%.1f", max(0, timeRemaining)))
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundColor(timeRemaining < 5 ? Color("AccentGlow") : .white)
-                    
-                    // Timer bar
-                    GeometryReader { barGeometry in
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(Color.white.opacity(0.1))
-                            
-                            Capsule()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color("AccentGlow"), Color("HighlightTone")],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .frame(width: barGeometry.size.width * CGFloat(timeRemaining / timeLimit))
-                                .animation(.linear(duration: 0.1), value: timeRemaining)
-                        }
+            VStack(spacing: 16) {
+                // Stats bar
+                HStack {
+                    // Collectibles
+                    HStack(spacing: 4) {
+                        Image(systemName: "diamond.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color.cyan)
+                        Text("\(collectedItems.count)/\(collectibles.count)")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
                     }
-                    .frame(height: 6)
-                    .padding(.horizontal, 40)
+                    
+                    Spacer()
+                    
+                    // Score
+                    VStack(spacing: 2) {
+                        Text("Score")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundColor(Color("HighlightTone").opacity(0.7))
+                        Text("\(score)")
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(Color("AccentGlow"))
+                    }
+                    
+                    Spacer()
+                    
+                    // Timer
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(timeRemaining < 10 ? Color("AccentGlow") : Color("HighlightTone"))
+                        Text(String(format: "%.1f", max(0, timeRemaining)))
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundColor(timeRemaining < 10 ? Color("AccentGlow") : .white)
+                    }
                 }
-                .padding(.top, 16)
+                .padding(.horizontal, 24)
+                
+                // Timer bar
+                GeometryReader { barGeometry in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.white.opacity(0.1))
+                        
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.cyan, Color("HighlightTone")],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: barGeometry.size.width * CGFloat(timeRemaining / config.timeLimit))
+                    }
+                }
+                .frame(height: 6)
+                .padding(.horizontal, 24)
                 
                 Spacer()
                 
                 // Maze
-                let cellSize = min((geometry.size.width - 48) / CGFloat(mazeSize), 60.0)
+                let cellSize = min((geometry.size.width - 40) / CGFloat(config.mazeSize), 50.0)
                 
                 ZStack {
                     // Maze grid
                     VStack(spacing: 0) {
-                        ForEach(0..<mazeSize, id: \.self) { row in
+                        ForEach(0..<config.mazeSize, id: \.self) { row in
                             HStack(spacing: 0) {
-                                ForEach(0..<mazeSize, id: \.self) { col in
-                                    MazeCellView(
-                                        cell: maze.indices.contains(row) && maze[row].indices.contains(col) ? maze[row][col] : .wall,
-                                        isStart: CGPoint(x: col, y: row) == startPoint,
-                                        isEnd: CGPoint(x: col, y: row) == endPoint,
-                                        isInPath: currentPath.contains(CGPoint(x: col, y: row)),
+                                ForEach(0..<config.mazeSize, id: \.self) { col in
+                                    let point = CGPoint(x: col, y: row)
+                                    let key = "\(col),\(row)"
+                                    let isVisible = !config.hasFog || isCellVisible(col: col, row: row)
+                                    
+                                    LabyrinthCellView(
+                                        cell: getCellAt(row: row, col: col),
+                                        isStart: point == startPoint,
+                                        isEnd: point == endPoint,
+                                        isInPath: currentPath.contains(point),
+                                        hasCollectible: collectibles.contains(point) && !collectedItems.contains(key),
+                                        isVisible: isVisible,
                                         size: cellSize
                                     )
                                 }
@@ -108,12 +145,10 @@ struct EchoSequenceLabyrinthGame: View {
                         }
                     }
                     .overlay(
-                        // Path drawing overlay
-                        PathDrawingView(
+                        PathDrawingOverlay(
                             path: currentPath,
                             cellSize: cellSize,
-                            mazeSize: mazeSize,
-                            isComplete: gameState == .success
+                            mazeSize: config.mazeSize
                         )
                     )
                     .gesture(
@@ -127,7 +162,7 @@ struct EchoSequenceLabyrinthGame: View {
                     )
                     .disabled(gameState != .playing)
                 }
-                .padding(.horizontal, 24)
+                .padding(.horizontal, 20)
                 
                 Spacer()
                 
@@ -139,22 +174,13 @@ struct EchoSequenceLabyrinthGame: View {
                         }
                         .padding(.horizontal, 40)
                         
-                        if showInstructions && gameState == .ready {
-                            Text("Draw a path from start to end through the maze")
-                                .font(.system(size: 14, weight: .regular, design: .rounded))
-                                .foregroundColor(Color("HighlightTone").opacity(0.7))
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 32)
+                        if config.hasFog {
+                            Text("Navigate through the fog!")
+                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                .foregroundColor(Color.cyan.opacity(0.7))
                         }
                     }
-                    .padding(.bottom, 20)
-                }
-                
-                if gameState == .success {
-                    Text("Path Complete!")
-                        .font(.system(size: 20, weight: .semibold, design: .rounded))
-                        .foregroundColor(Color("AccentGlow"))
-                        .padding(.bottom, 20)
+                    .padding(.bottom, 16)
                 }
             }
         }
@@ -171,32 +197,64 @@ struct EchoSequenceLabyrinthGame: View {
         }
     }
     
+    private func getCellAt(row: Int, col: Int) -> MazeCell {
+        guard maze.indices.contains(row) && maze[row].indices.contains(col) else {
+            return .wall
+        }
+        return maze[row][col]
+    }
+    
+    private func isCellVisible(col: Int, row: Int) -> Bool {
+        guard config.hasFog else { return true }
+        
+        // Always show start and end
+        if CGPoint(x: col, y: row) == startPoint || CGPoint(x: col, y: row) == endPoint {
+            return true
+        }
+        
+        // Check if near current path position
+        if let lastPoint = currentPath.last {
+            let dx = abs(Int(lastPoint.x) - col)
+            let dy = abs(Int(lastPoint.y) - row)
+            if dx <= config.fogRadius && dy <= config.fogRadius {
+                return true
+            }
+        }
+        
+        // Check if near start when no path yet
+        if currentPath.isEmpty {
+            let dx = abs(Int(startPoint.x) - col)
+            let dy = abs(Int(startPoint.y) - row)
+            if dx <= config.fogRadius && dy <= config.fogRadius {
+                return true
+            }
+        }
+        
+        // Check if previously revealed
+        return revealedCells.contains("\(col),\(row)")
+    }
+    
     private func generateMaze() {
-        // Initialize maze with walls
-        maze = Array(repeating: Array(repeating: MazeCell.wall, count: mazeSize), count: mazeSize)
+        let size = config.mazeSize
+        maze = Array(repeating: Array(repeating: MazeCell.wall, count: size), count: size)
         
-        // Set start and end points
         startPoint = CGPoint(x: 0, y: 0)
-        endPoint = CGPoint(x: mazeSize - 1, y: mazeSize - 1)
+        endPoint = CGPoint(x: size - 1, y: size - 1)
         
-        // Generate a solvable path using a simple algorithm
         generatePath()
-        
-        // Add some extra open cells for variety
         addExtraPaths()
+        generateCollectibles()
         
         gameState = .ready
     }
     
     private func generatePath() {
         var current = startPoint
-        correctPath = [current]
         maze[Int(current.y)][Int(current.x)] = .path
         
         while current != endPoint {
             var possibleMoves: [CGPoint] = []
             
-            // Prefer moving towards end
             if current.x < endPoint.x {
                 possibleMoves.append(CGPoint(x: current.x + 1, y: current.y))
             }
@@ -204,43 +262,40 @@ struct EchoSequenceLabyrinthGame: View {
                 possibleMoves.append(CGPoint(x: current.x, y: current.y + 1))
             }
             
-            // Add some randomness
-            if Bool.random() && current.x > 0 && !correctPath.contains(CGPoint(x: current.x - 1, y: current.y)) {
-                possibleMoves.append(CGPoint(x: current.x - 1, y: current.y))
+            // Add some randomness for more interesting paths
+            if Bool.random() && current.x > 0 {
+                let backPoint = CGPoint(x: current.x - 1, y: current.y)
+                if maze[Int(backPoint.y)][Int(backPoint.x)] == .wall {
+                    possibleMoves.append(backPoint)
+                }
             }
-            if Bool.random() && current.y > 0 && !correctPath.contains(CGPoint(x: current.x, y: current.y - 1)) {
-                possibleMoves.append(CGPoint(x: current.x, y: current.y - 1))
+            if Bool.random() && current.y > 0 {
+                let backPoint = CGPoint(x: current.x, y: current.y - 1)
+                if maze[Int(backPoint.y)][Int(backPoint.x)] == .wall {
+                    possibleMoves.append(backPoint)
+                }
             }
             
             if let nextMove = possibleMoves.randomElement() {
                 current = nextMove
-                if !correctPath.contains(current) {
-                    correctPath.append(current)
-                    maze[Int(current.y)][Int(current.x)] = .path
-                }
+                maze[Int(current.y)][Int(current.x)] = .path
             } else {
-                // Force move towards end
                 if current.x < endPoint.x {
                     current = CGPoint(x: current.x + 1, y: current.y)
                 } else {
                     current = CGPoint(x: current.x, y: current.y + 1)
                 }
-                if !correctPath.contains(current) {
-                    correctPath.append(current)
-                    maze[Int(current.y)][Int(current.x)] = .path
-                }
+                maze[Int(current.y)][Int(current.x)] = .path
             }
         }
     }
     
     private func addExtraPaths() {
-        // Add some random open cells to make the maze more interesting
-        let extraCells = mazeSize * 2
+        let extraCells = config.mazeSize * 3
         for _ in 0..<extraCells {
-            let x = Int.random(in: 0..<mazeSize)
-            let y = Int.random(in: 0..<mazeSize)
+            let x = Int.random(in: 0..<config.mazeSize)
+            let y = Int.random(in: 0..<config.mazeSize)
             
-            // Only add if adjacent to an existing path
             if isAdjacentToPath(x: x, y: y) {
                 maze[y][x] = .path
             }
@@ -250,7 +305,7 @@ struct EchoSequenceLabyrinthGame: View {
     private func isAdjacentToPath(x: Int, y: Int) -> Bool {
         let neighbors = [(x-1, y), (x+1, y), (x, y-1), (x, y+1)]
         for (nx, ny) in neighbors {
-            if nx >= 0 && nx < mazeSize && ny >= 0 && ny < mazeSize {
+            if nx >= 0 && nx < config.mazeSize && ny >= 0 && ny < config.mazeSize {
                 if maze[ny][nx] == .path {
                     return true
                 }
@@ -259,11 +314,29 @@ struct EchoSequenceLabyrinthGame: View {
         return false
     }
     
+    private func generateCollectibles() {
+        collectibles = []
+        var attempts = 0
+        
+        while collectibles.count < config.collectibleCount && attempts < 100 {
+            let x = Int.random(in: 1..<config.mazeSize-1)
+            let y = Int.random(in: 1..<config.mazeSize-1)
+            let point = CGPoint(x: x, y: y)
+            
+            if maze[y][x] == .path && point != startPoint && point != endPoint && !collectibles.contains(point) {
+                collectibles.append(point)
+            }
+            attempts += 1
+        }
+    }
+    
     private func startGame() {
-        showInstructions = false
         generateMaze()
-        timeRemaining = timeLimit
+        timeRemaining = config.timeLimit
         currentPath = []
+        collectedItems = []
+        revealedCells = []
+        score = 0
         gameState = .playing
     }
     
@@ -273,22 +346,19 @@ struct EchoSequenceLabyrinthGame: View {
         let col = Int(value.location.x / cellSize)
         let row = Int(value.location.y / cellSize)
         
-        guard row >= 0 && row < mazeSize && col >= 0 && col < mazeSize else { return }
+        guard row >= 0 && row < config.mazeSize && col >= 0 && col < config.mazeSize else { return }
+        guard maze[row][col] == .path else { return }
         
         let point = CGPoint(x: col, y: row)
         
-        // Check if this is a valid path cell
-        guard maze[row][col] == .path else { return }
-        
-        // If starting, must start from start point
         if currentPath.isEmpty {
             if point == startPoint {
                 currentPath.append(point)
+                revealCellsAround(col: col, row: row)
             }
             return
         }
         
-        // Check if adjacent to last point
         if let lastPoint = currentPath.last {
             let dx = abs(point.x - lastPoint.x)
             let dy = abs(point.y - lastPoint.y)
@@ -296,14 +366,30 @@ struct EchoSequenceLabyrinthGame: View {
             if (dx == 1 && dy == 0) || (dx == 0 && dy == 1) {
                 if !currentPath.contains(point) {
                     currentPath.append(point)
+                    revealCellsAround(col: col, row: row)
                     
-                    // Check if reached end
-                    if point == endPoint {
-                        gameState = .success
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            onLevelComplete()
-                        }
+                    // Check for collectibles
+                    let key = "\(col),\(row)"
+                    if collectibles.contains(point) && !collectedItems.contains(key) {
+                        collectedItems.insert(key)
+                        score += 50
                     }
+                    
+                    if point == endPoint {
+                        completeLevel()
+                    }
+                }
+            }
+        }
+    }
+    
+    private func revealCellsAround(col: Int, row: Int) {
+        for dx in -config.fogRadius...config.fogRadius {
+            for dy in -config.fogRadius...config.fogRadius {
+                let nx = col + dx
+                let ny = row + dy
+                if nx >= 0 && nx < config.mazeSize && ny >= 0 && ny < config.mazeSize {
+                    revealedCells.insert("\(nx),\(ny)")
                 }
             }
         }
@@ -311,9 +397,35 @@ struct EchoSequenceLabyrinthGame: View {
     
     private func handleDragEnd() {
         if gameState == .playing && currentPath.last != endPoint {
-            // Reset path if not complete
             currentPath = []
         }
+    }
+    
+    private func completeLevel() {
+        gameState = .success
+        
+        // Bonus for remaining time
+        let timeBonus = Int(timeRemaining * 2)
+        score += timeBonus
+        
+        // Bonus for collecting all items
+        if collectedItems.count == collectibles.count && collectibles.count > 0 {
+            score += 100
+        }
+        
+        let stars = calculateStars()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            onComplete(score, stars)
+        }
+    }
+    
+    private func calculateStars() -> Int {
+        let allCollected = collectedItems.count == collectibles.count
+        let timePercentage = timeRemaining / config.timeLimit
+        
+        if allCollected && timePercentage > 0.5 { return 3 }
+        if allCollected || timePercentage > 0.3 { return 2 }
+        return 1
     }
 }
 
@@ -322,11 +434,13 @@ enum MazeCell {
     case path
 }
 
-struct MazeCellView: View {
+struct LabyrinthCellView: View {
     let cell: MazeCell
     let isStart: Bool
     let isEnd: Bool
     let isInPath: Bool
+    let hasCollectible: Bool
+    let isVisible: Bool
     let size: CGFloat
     
     var body: some View {
@@ -335,41 +449,50 @@ struct MazeCellView: View {
                 .fill(cellColor)
                 .frame(width: size, height: size)
             
-            if isStart {
-                Circle()
-                    .fill(Color("AccentGlow"))
-                    .frame(width: size * 0.5, height: size * 0.5)
-                    .shadow(color: Color("AccentGlow").opacity(0.5), radius: 4)
-            }
-            
-            if isEnd {
-                Image(systemName: "flag.fill")
-                    .font(.system(size: size * 0.4))
-                    .foregroundColor(Color("HighlightTone"))
+            if isVisible {
+                if isStart {
+                    Circle()
+                        .fill(Color.cyan)
+                        .frame(width: size * 0.5, height: size * 0.5)
+                }
+                
+                if isEnd {
+                    Image(systemName: "flag.fill")
+                        .font(.system(size: size * 0.4))
+                        .foregroundColor(Color("HighlightTone"))
+                }
+                
+                if hasCollectible {
+                    Image(systemName: "diamond.fill")
+                        .font(.system(size: size * 0.35))
+                        .foregroundColor(Color.cyan)
+                }
             }
             
             Rectangle()
-                .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+                .stroke(Color.white.opacity(0.05), lineWidth: 0.5)
                 .frame(width: size, height: size)
         }
     }
     
     private var cellColor: Color {
+        if !isVisible {
+            return Color.black.opacity(0.8)
+        }
         if cell == .wall {
             return Color("PrimaryBackground")
         } else if isInPath {
-            return Color("AccentGlow").opacity(0.4)
+            return Color.cyan.opacity(0.3)
         } else {
             return Color.white.opacity(0.08)
         }
     }
 }
 
-struct PathDrawingView: View {
+struct PathDrawingOverlay: View {
     let path: [CGPoint]
     let cellSize: CGFloat
     let mazeSize: Int
-    let isComplete: Bool
     
     var body: some View {
         Canvas { context, size in
@@ -388,22 +511,20 @@ struct PathDrawingView: View {
                 }
             }
             
-            // Draw glow
             context.stroke(
                 drawPath,
-                with: .color(Color("AccentGlow").opacity(0.5)),
-                style: StrokeStyle(lineWidth: 12, lineCap: .round, lineJoin: .round)
+                with: .color(Color.cyan.opacity(0.5)),
+                style: StrokeStyle(lineWidth: 10, lineCap: .round, lineJoin: .round)
             )
             
-            // Draw main path
             context.stroke(
                 drawPath,
                 with: .linearGradient(
-                    Gradient(colors: [Color("AccentGlow"), Color("HighlightTone")]),
+                    Gradient(colors: [Color.cyan, Color("HighlightTone")]),
                     startPoint: CGPoint(x: 0, y: 0),
                     endPoint: CGPoint(x: size.width, y: size.height)
                 ),
-                style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round)
+                style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round)
             )
         }
     }
@@ -414,11 +535,6 @@ struct PathDrawingView: View {
         Color("PrimaryBackground")
             .ignoresSafeArea()
         
-        EchoSequenceLabyrinthGame(
-            difficulty: .easy,
-            currentLevel: 1,
-            onLevelComplete: {}
-        )
+        EchoSequenceLabyrinthGame(level: 5, onComplete: { _, _ in })
     }
 }
-

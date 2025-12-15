@@ -7,7 +7,7 @@
 
 struct DataManager {
 
-    let SERVER_URL = "smtapp.autos" // -- заменить
+    let SERVER_URL = "mkapp.autos" // -- заменить
     
     
     // не трогать это

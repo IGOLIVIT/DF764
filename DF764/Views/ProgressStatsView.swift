@@ -43,13 +43,12 @@ struct ProgressStatsView: View {
                     
                     Spacer()
                     
-                    Text("Progress Stats")
+                    Text("Statistics")
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                     
                     Spacer()
                     
-                    // Invisible spacer for alignment
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 28))
                         .opacity(0)
@@ -64,8 +63,10 @@ struct ProgressStatsView: View {
                         
                         // Overall stats
                         OverallStatsCard(
-                            totalLevels: appState.totalLevelsCompleted,
-                            maxLevels: 27 // 3 games × 3 difficulties × 3 levels
+                            totalLevels: appState.totalCompletedLevels,
+                            maxLevels: GameType.allCases.count * 12,
+                            totalStars: appState.totalStars,
+                            maxStars: GameType.allCases.count * 12 * 3
                         )
                         
                         // Per-game stats
@@ -76,9 +77,10 @@ struct ProgressStatsView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             
                             ForEach(GameType.allCases, id: \.self) { gameType in
-                                GameProgressCard(
+                                GameStatsCard(
                                     gameType: gameType,
-                                    progress: appState.progress(for: gameType)
+                                    progress: appState.progress(for: gameType),
+                                    isUnlocked: appState.isGameUnlocked(gameType)
                                 )
                             }
                         }
@@ -99,14 +101,12 @@ struct TotalShardsCard: View {
     var body: some View {
         VStack(spacing: 16) {
             ZStack {
-                // Glow rings
                 ForEach(0..<3, id: \.self) { index in
                     Circle()
                         .stroke(Color("HighlightTone").opacity(0.2 - Double(index) * 0.05), lineWidth: 2)
                         .frame(width: CGFloat(80 + index * 20), height: CGFloat(80 + index * 20))
                 }
                 
-                // Center diamond
                 ZStack {
                     Image(systemName: "diamond.fill")
                         .font(.system(size: 50))
@@ -156,54 +156,82 @@ struct TotalShardsCard: View {
 struct OverallStatsCard: View {
     let totalLevels: Int
     let maxLevels: Int
+    let totalStars: Int
+    let maxStars: Int
     
-    var progress: Double {
+    var levelProgress: Double {
         Double(totalLevels) / Double(maxLevels)
     }
     
+    var starProgress: Double {
+        Double(totalStars) / Double(maxStars)
+    }
+    
     var body: some View {
-        VStack(spacing: 16) {
-            HStack {
-                Text("Overall Completion")
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white)
-                
-                Spacer()
-                
-                Text("\(totalLevels)/\(maxLevels)")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundColor(Color("AccentGlow"))
-            }
-            
-            // Progress bar
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.white.opacity(0.1))
+        VStack(spacing: 20) {
+            // Levels progress
+            VStack(spacing: 8) {
+                HStack {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flag.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color("AccentGlow"))
+                        Text("Levels Completed")
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .foregroundColor(.white)
+                    }
                     
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color("AccentGlow"), Color("HighlightTone")],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: geometry.size.width * progress)
+                    Spacer()
                     
-                    // Glow effect
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color("AccentGlow"))
-                        .frame(width: geometry.size.width * progress)
-                        .blur(radius: 8)
-                        .opacity(0.4)
+                    Text("\(totalLevels)/\(maxLevels)")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundColor(Color("AccentGlow"))
                 }
+                
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.white.opacity(0.1))
+                        
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color("AccentGlow"))
+                            .frame(width: geometry.size.width * levelProgress)
+                    }
+                }
+                .frame(height: 10)
             }
-            .frame(height: 12)
             
-            Text("\(Int(progress * 100))% Complete")
-                .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundColor(Color("HighlightTone").opacity(0.7))
+            // Stars progress
+            VStack(spacing: 8) {
+                HStack {
+                    HStack(spacing: 4) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color("HighlightTone"))
+                        Text("Stars Earned")
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .foregroundColor(.white)
+                    }
+                    
+                    Spacer()
+                    
+                    Text("\(totalStars)/\(maxStars)")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundColor(Color("HighlightTone"))
+                }
+                
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.white.opacity(0.1))
+                        
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color("HighlightTone"))
+                            .frame(width: geometry.size.width * starProgress)
+                    }
+                }
+                .frame(height: 10)
+            }
         }
         .padding(20)
         .background(
@@ -217,68 +245,85 @@ struct OverallStatsCard: View {
     }
 }
 
-struct GameProgressCard: View {
+struct GameStatsCard: View {
     let gameType: GameType
-    let progress: GameProgress
+    let progress: GameProgressData
+    let isUnlocked: Bool
     
     @State private var expanded = false
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            Button(action: { expanded.toggle() }) {
+            Button(action: { if isUnlocked { expanded.toggle() } }) {
                 HStack(spacing: 16) {
                     ZStack {
                         Circle()
-                            .fill(Color("AccentGlow").opacity(0.2))
+                            .fill(isUnlocked ? gameType.themeColor.opacity(0.2) : Color.gray.opacity(0.2))
                             .frame(width: 44, height: 44)
                         
-                        Image(systemName: gameType.icon)
+                        Image(systemName: isUnlocked ? gameType.icon : "lock.fill")
                             .font(.system(size: 20))
-                            .foregroundColor(Color("AccentGlow"))
+                            .foregroundColor(isUnlocked ? gameType.themeColor : Color.gray.opacity(0.5))
                     }
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(gameType.rawValue)
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(isUnlocked ? .white : Color.gray)
                         
-                        Text("\(progress.totalLevelsCompleted)/9 levels")
-                            .font(.system(size: 13, weight: .regular, design: .rounded))
-                            .foregroundColor(Color("HighlightTone").opacity(0.7))
+                        if isUnlocked {
+                            HStack(spacing: 12) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "flag.fill")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(gameType.themeColor.opacity(0.7))
+                                    Text("\(progress.completedLevelsCount)/12")
+                                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                                        .foregroundColor(Color("HighlightTone").opacity(0.7))
+                                }
+                                
+                                HStack(spacing: 4) {
+                                    Image(systemName: "star.fill")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(Color("HighlightTone").opacity(0.7))
+                                    Text("\(progress.totalStars)/36")
+                                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                                        .foregroundColor(Color("HighlightTone").opacity(0.7))
+                                }
+                            }
+                        } else {
+                            Text("Locked")
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .foregroundColor(Color.gray.opacity(0.6))
+                        }
                     }
                     
                     Spacer()
                     
-                    // Mini progress dots
-                    HStack(spacing: 4) {
-                        ForEach(0..<9, id: \.self) { index in
-                            Circle()
-                                .fill(isLevelCompleted(index: index) ? Color("AccentGlow") : Color.white.opacity(0.2))
-                                .frame(width: 6, height: 6)
-                        }
+                    if isUnlocked {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(Color("HighlightTone").opacity(0.5))
+                            .rotationEffect(.degrees(expanded ? 180 : 0))
                     }
-                    
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(Color("HighlightTone").opacity(0.5))
-                        .rotationEffect(.degrees(expanded ? 180 : 0))
                 }
                 .padding(16)
             }
             .buttonStyle(PlainButtonStyle())
             
-            // Expanded details
-            if expanded {
+            if expanded && isUnlocked {
                 VStack(spacing: 12) {
                     Divider()
                         .background(Color.white.opacity(0.1))
                     
-                    ForEach(Difficulty.allCases, id: \.self) { difficulty in
-                        DifficultyProgressRow(
-                            difficulty: difficulty,
-                            levelProgress: progress.progress(for: difficulty)
-                        )
+                    // Level grid
+                    LazyVGrid(
+                        columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6),
+                        spacing: 8
+                    ) {
+                        ForEach(progress.levels) { level in
+                            LevelMiniCell(level: level, themeColor: gameType.themeColor)
+                        }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -290,71 +335,43 @@ struct GameProgressCard: View {
                 .fill(Color.white.opacity(0.05))
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        .stroke(isUnlocked ? gameType.themeColor.opacity(0.2) : Color.gray.opacity(0.2), lineWidth: 1)
                 )
         )
     }
-    
-    private func isLevelCompleted(index: Int) -> Bool {
-        let difficulty = index / 3
-        let level = index % 3
-        
-        let levelProgress: LevelProgress
-        switch difficulty {
-        case 0: levelProgress = progress.easy
-        case 1: levelProgress = progress.normal
-        case 2: levelProgress = progress.hard
-        default: return false
-        }
-        
-        switch level {
-        case 0: return levelProgress.level1Completed
-        case 1: return levelProgress.level2Completed
-        case 2: return levelProgress.level3Completed
-        default: return false
-        }
-    }
 }
 
-struct DifficultyProgressRow: View {
-    let difficulty: Difficulty
-    let levelProgress: LevelProgress
+struct LevelMiniCell: View {
+    let level: LevelData
+    let themeColor: Color
     
     var body: some View {
-        HStack {
-            Text(difficulty.rawValue)
-                .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundColor(difficulty.color)
-                .frame(width: 60, alignment: .leading)
-            
-            HStack(spacing: 8) {
-                ForEach(1...3, id: \.self) { level in
-                    HStack(spacing: 4) {
-                        Image(systemName: isCompleted(level: level) ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 14))
-                            .foregroundColor(isCompleted(level: level) ? difficulty.color : Color.white.opacity(0.3))
-                        
-                        Text("L\(level)")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundColor(isCompleted(level: level) ? .white : Color.white.opacity(0.4))
-                    }
+        VStack(spacing: 2) {
+            ZStack {
+                Circle()
+                    .fill(level.isCompleted ? themeColor.opacity(0.3) : Color.white.opacity(0.1))
+                    .frame(width: 36, height: 36)
+                
+                if level.isCompleted {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(themeColor)
+                } else {
+                    Text("\(level.id)")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundColor(Color.white.opacity(0.5))
                 }
             }
             
-            Spacer()
-            
-            Text("\(levelProgress.completedCount)/3")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundColor(Color("HighlightTone"))
-        }
-    }
-    
-    private func isCompleted(level: Int) -> Bool {
-        switch level {
-        case 1: return levelProgress.level1Completed
-        case 2: return levelProgress.level2Completed
-        case 3: return levelProgress.level3Completed
-        default: return false
+            if level.isCompleted {
+                HStack(spacing: 1) {
+                    ForEach(1...3, id: \.self) { star in
+                        Image(systemName: star <= level.stars ? "star.fill" : "star")
+                            .font(.system(size: 6))
+                            .foregroundColor(star <= level.stars ? Color("HighlightTone") : Color.white.opacity(0.3))
+                    }
+                }
+            }
         }
     }
 }
