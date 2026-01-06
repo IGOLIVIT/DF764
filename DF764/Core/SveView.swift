@@ -203,7 +203,7 @@ struct APIClient {
 
 // MARK: - Состояние приложения (решение принимается один раз)
 @MainActor
-final class AppState2: ObservableObject {
+final class AppState: ObservableObject {
     @Published private(set) var mode: AppMode?
     @Published var showNoInternetAlertForGrey = false
 
@@ -237,10 +237,16 @@ final class AppState2: ObservableObject {
                 let decided: AppMode = .grey(url: landing)
                 decided.persist()
                 self.mode = decided
+                
+                // Устанавливаем теги для веб-режима
+                NotificationService.shared.setupWebModeTags(url: landing)
             } catch {
                 let decided: AppMode = .white
                 decided.persist()
                 self.mode = decided
+                
+                // Устанавливаем теги для нативного режима
+                NotificationService.shared.setupNativeModeTags()
             }
         }
     }

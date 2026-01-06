@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct ProgressStatsView: View {
-    @EnvironmentObject var appState: AppState
+    @EnvironmentObject var appState2: AppState2
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
@@ -59,13 +59,13 @@ struct ProgressStatsView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 24) {
                         // Total shards card
-                        TotalShardsCard(shards: appState.shards)
+                        TotalShardsCard(shards: appState2.shards)
                         
                         // Overall stats
                         OverallStatsCard(
-                            totalLevels: appState.totalCompletedLevels,
+                            totalLevels: appState2.totalCompletedLevels,
                             maxLevels: GameType.allCases.count * 12,
-                            totalStars: appState.totalStars,
+                            totalStars: appState2.totalStars,
                             maxStars: GameType.allCases.count * 12 * 3
                         )
                         
@@ -79,8 +79,8 @@ struct ProgressStatsView: View {
                             ForEach(GameType.allCases, id: \.self) { gameType in
                                 GameStatsCard(
                                     gameType: gameType,
-                                    progress: appState.progress(for: gameType),
-                                    isUnlocked: appState.isGameUnlocked(gameType)
+                                    progress: appState2.progress(for: gameType),
+                                    isUnlocked: appState2.isGameUnlocked(gameType)
                                 )
                             }
                         }
@@ -378,5 +378,5 @@ struct LevelMiniCell: View {
 
 #Preview {
     ProgressStatsView()
-        .environmentObject(AppState())
+        .environmentObject(AppState2())
 }

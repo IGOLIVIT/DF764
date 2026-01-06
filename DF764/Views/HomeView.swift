@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct HomeView: View {
-    @EnvironmentObject var appState: AppState
+    @EnvironmentObject var appState2: AppState2
     @State private var selectedGame: GameType?
     @State private var showSettings = false
     @State private var showStats = false
@@ -56,7 +56,7 @@ struct HomeView: View {
                                 Image(systemName: "diamond.fill")
                                     .font(.system(size: 16))
                                     .foregroundColor(Color("HighlightTone"))
-                                Text("\(appState.shards)")
+                                Text("\(appState2.shards)")
                                     .font(.system(size: 18, weight: .bold, design: .rounded))
                                     .foregroundColor(.white)
                             }
@@ -76,8 +76,8 @@ struct HomeView: View {
                         
                         // Progress summary
                         ProgressSummaryCard(
-                            totalLevels: appState.totalCompletedLevels,
-                            totalStars: appState.totalStars,
+                            totalLevels: appState2.totalCompletedLevels,
+                            totalStars: appState2.totalStars,
                             maxLevels: GameType.allCases.count * 12,
                             maxStars: GameType.allCases.count * 12 * 3
                         )
@@ -93,11 +93,11 @@ struct HomeView: View {
                             ForEach(GameType.allCases, id: \.self) { gameType in
                                 GameCardNew(
                                     gameType: gameType,
-                                    progress: appState.progress(for: gameType),
-                                    isUnlocked: appState.isGameUnlocked(gameType),
+                                    progress: appState2.progress(for: gameType),
+                                    isUnlocked: appState2.isGameUnlocked(gameType),
                                     unlockRequirement: gameType.unlockRequirement
                                 ) {
-                                    if appState.isGameUnlocked(gameType) {
+                                    if appState2.isGameUnlocked(gameType) {
                                         selectedGame = gameType
                                     }
                                 }
@@ -125,15 +125,15 @@ struct HomeView: View {
             .navigationBarHidden(true)
             .fullScreenCover(item: $selectedGame) { gameType in
                 LevelMapView(gameType: gameType)
-                    .environmentObject(appState)
+                    .environmentObject(appState2)
             }
             .fullScreenCover(isPresented: $showStats) {
                 ProgressStatsView()
-                    .environmentObject(appState)
+                    .environmentObject(appState2)
             }
             .fullScreenCover(isPresented: $showSettings) {
                 SettingsView()
-                    .environmentObject(appState)
+                    .environmentObject(appState2)
             }
         }
     }
@@ -326,5 +326,5 @@ struct GameCardNew: View {
 
 #Preview {
     HomeView()
-        .environmentObject(AppState())
+        .environmentObject(AppState2())
 }

@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @EnvironmentObject var appState: AppState
+    @EnvironmentObject var appState2: AppState2
     @Environment(\.dismiss) var dismiss
     @State private var showResetConfirmation = false
     @State private var showStats = false
@@ -121,7 +121,7 @@ struct SettingsView: View {
             if showResetConfirmation {
                 ResetConfirmationModal(
                     onConfirm: {
-                        appState.resetProgress()
+                        appState2.resetProgress()
                         showResetConfirmation = false
                     },
                     onCancel: {
@@ -132,7 +132,7 @@ struct SettingsView: View {
         }
         .fullScreenCover(isPresented: $showStats) {
             ProgressStatsView()
-                .environmentObject(appState)
+                .environmentObject(appState2)
         }
     }
 }
@@ -266,5 +266,5 @@ struct ResetConfirmationModal: View {
 
 #Preview {
     SettingsView()
-        .environmentObject(AppState())
+        .environmentObject(AppState2())
 }

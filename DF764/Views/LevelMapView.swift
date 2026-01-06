@@ -6,14 +6,14 @@
 import SwiftUI
 
 struct LevelMapView: View {
-    @EnvironmentObject var appState: AppState
+    @EnvironmentObject var appState2: AppState2
     @Environment(\.dismiss) var dismiss
     let gameType: GameType
     
     @State private var selectedLevel: Int?
     
     var progress: GameProgressData {
-        appState.progress(for: gameType)
+        appState2.progress(for: gameType)
     }
     
     var body: some View {
@@ -72,7 +72,7 @@ struct LevelMapView: View {
                         Image(systemName: "diamond.fill")
                             .font(.system(size: 14))
                             .foregroundColor(Color("HighlightTone"))
-                        Text("\(appState.shards)")
+                        Text("\(appState2.shards)")
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                     }
@@ -120,7 +120,7 @@ struct LevelMapView: View {
         )) {
             if let level = selectedLevel {
                 GamePlayView(gameType: gameType, level: level)
-                    .environmentObject(appState)
+                    .environmentObject(appState2)
             }
         }
     }
@@ -198,7 +198,7 @@ struct LevelNode: View {
 }
 
 struct GamePlayView: View {
-    @EnvironmentObject var appState: AppState
+    @EnvironmentObject var appState2: AppState2
     @Environment(\.dismiss) var dismiss
     
     let gameType: GameType
@@ -281,7 +281,7 @@ struct GamePlayView: View {
     }
     
     private func handleComplete(score: Int, stars: Int) {
-        appState.completeLevel(gameType: gameType, level: level, score: score, stars: stars)
+        appState2.completeLevel(gameType: gameType, level: level, score: score, stars: stars)
         resultScore = score
         resultStars = stars
         showResult = true
@@ -351,6 +351,6 @@ struct LevelCompleteView: View {
 
 #Preview {
     LevelMapView(gameType: .pulsePathGrid)
-        .environmentObject(AppState())
+        .environmentObject(AppState2())
 }
 

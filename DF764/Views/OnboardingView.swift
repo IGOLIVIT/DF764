@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct OnboardingView: View {
-    @EnvironmentObject var appState: AppState
+    @EnvironmentObject var appState2: AppState2
     @State private var currentPage = 0
     
     private let pages: [(title: String, description: String)] = [
@@ -58,7 +58,7 @@ struct OnboardingView: View {
                         }
                         
                         Button(action: {
-                            appState.hasCompletedOnboarding = true
+                            appState2.hasCompletedOnboarding = true
                         }) {
                             Text("Skip")
                                 .font(.system(size: 16, weight: .medium))
@@ -66,7 +66,7 @@ struct OnboardingView: View {
                         }
                     } else {
                         GlowingButton(title: "Start") {
-                            appState.hasCompletedOnboarding = true
+                            appState2.hasCompletedOnboarding = true
                         }
                     }
                 }
@@ -215,5 +215,5 @@ struct HexagonShape: Shape {
 
 #Preview {
     OnboardingView()
-        .environmentObject(AppState())
+        .environmentObject(AppState2())
 }

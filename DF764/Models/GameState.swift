@@ -104,7 +104,7 @@ struct GameProgressData: Codable, Equatable {
 }
 
 // MARK: - App State
-class AppState: ObservableObject {
+class AppState2: ObservableObject {
     @Published var hasCompletedOnboarding: Bool {
         didSet {
             UserDefaults.standard.set(hasCompletedOnboarding, forKey: "hasCompletedOnboarding")
