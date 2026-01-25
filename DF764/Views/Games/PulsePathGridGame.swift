@@ -260,9 +260,15 @@ struct PulsePathGridGame: View {
             playerSequence.append(index)
             highlightedTile = index
             
+            // Haptic and sound feedback for correct tap
+            HapticsManager.shared.tileTap()
+            AudioManager.shared.playTileTap()
+            
             // Bonus points for bonus tiles
             if bonusTiles.contains(index) {
                 score += 25
+                HapticsManager.shared.collectiblePickup()
+                AudioManager.shared.playCollectible()
             }
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -273,6 +279,8 @@ struct PulsePathGridGame: View {
                 // Round complete
                 score += 50 + timeBonus
                 gameState = .success
+                HapticsManager.shared.correctSequence()
+                AudioManager.shared.playCorrect()
                 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     if round < totalRounds {
@@ -282,6 +290,8 @@ struct PulsePathGridGame: View {
                     } else {
                         // Level complete
                         let stars = calculateStars()
+                        HapticsManager.shared.levelComplete()
+                        AudioManager.shared.playLevelComplete()
                         onComplete(score, stars)
                     }
                 }
@@ -290,6 +300,10 @@ struct PulsePathGridGame: View {
             gameState = .failed
             wrongTile = index
             score = max(0, score - 20)
+            
+            // Haptic and sound feedback for wrong tap
+            HapticsManager.shared.wrongSequence()
+            AudioManager.shared.playError()
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 wrongTile = nil

@@ -354,6 +354,14 @@ struct MomentumShiftArenaGame: View {
                 combo += 1
                 multiplier = 1.0 + Double(min(combo, 10)) * 0.1
                 lastCatchTime = Date()
+                HapticsManager.shared.orbCaught()
+                AudioManager.shared.playCorrect()
+                
+                // Combo haptic feedback
+                if combo > 0 && combo % 5 == 0 {
+                    HapticsManager.shared.comboAchieved()
+                    AudioManager.shared.playCombo()
+                }
                 
             case .golden:
                 let points = activePowerUp == .doublePoints ? 6 : 3
@@ -361,11 +369,15 @@ struct MomentumShiftArenaGame: View {
                 combo += 2
                 multiplier = 1.0 + Double(min(combo, 10)) * 0.1
                 lastCatchTime = Date()
+                HapticsManager.shared.heavyImpact()
+                AudioManager.shared.playCollectible()
                 
             case .danger:
                 score = max(0, score - 2)
                 combo = 0
                 multiplier = 1.0
+                HapticsManager.shared.error()
+                AudioManager.shared.playError()
             }
             
             checkWin()
@@ -375,6 +387,8 @@ struct MomentumShiftArenaGame: View {
     private func collectPowerUp(_ powerUp: PowerUp) {
         powerUps.removeAll { $0.id == powerUp.id }
         activePowerUp = powerUp.type
+        HapticsManager.shared.collectiblePickup()
+        AudioManager.shared.playCollectible()
         
         // Power-up duration
         DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
@@ -387,6 +401,8 @@ struct MomentumShiftArenaGame: View {
     private func checkWin() {
         if score >= targetScore {
             gameState = .success
+            HapticsManager.shared.levelComplete()
+            AudioManager.shared.playLevelComplete()
             let stars = calculateStars()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 onComplete(score, stars)
@@ -397,10 +413,13 @@ struct MomentumShiftArenaGame: View {
     private func endGame() {
         if score >= targetScore {
             gameState = .success
+            HapticsManager.shared.levelComplete()
+            AudioManager.shared.playLevelComplete()
             let stars = calculateStars()
             onComplete(score, stars)
         } else {
             gameState = .failed
+            HapticsManager.shared.error()
         }
     }
     

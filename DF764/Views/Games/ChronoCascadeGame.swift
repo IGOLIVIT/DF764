@@ -328,6 +328,16 @@ struct ChronoCascadeGame: View {
         lastFeedback = .perfect
         currentNodeIndex += 1
         
+        // Haptic and audio feedback
+        HapticsManager.shared.perfectHit()
+        AudioManager.shared.playPerfect()
+        
+        // Combo milestone haptic
+        if combo > 0 && combo % 5 == 0 {
+            HapticsManager.shared.comboAchieved()
+            AudioManager.shared.playCombo()
+        }
+        
         clearFeedback()
     }
     
@@ -342,6 +352,10 @@ struct ChronoCascadeGame: View {
         lastFeedback = .good
         currentNodeIndex += 1
         
+        // Haptic and audio feedback
+        HapticsManager.shared.goodHit()
+        AudioManager.shared.playCorrect()
+        
         clearFeedback()
     }
     
@@ -352,9 +366,14 @@ struct ChronoCascadeGame: View {
         lastFeedback = .miss
         currentNodeIndex += 1
         
+        // Haptic and audio feedback
+        HapticsManager.shared.missedHit()
+        AudioManager.shared.playMiss()
+        
         // Check for too many misses
         if missCount >= config.nodeCount / 2 + 1 {
             gameState = .failed
+            HapticsManager.shared.error()
             return
         }
         
@@ -375,6 +394,8 @@ struct ChronoCascadeGame: View {
         if roundsCompleted >= config.rounds {
             // Level complete
             gameState = .success
+            HapticsManager.shared.levelComplete()
+            AudioManager.shared.playLevelComplete()
             let stars = calculateStars()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 onComplete(score, stars)
@@ -384,6 +405,7 @@ struct ChronoCascadeGame: View {
             nodeProgress = 0
             currentNodeIndex = 0
             generateNodes()
+            HapticsManager.shared.success()
         }
     }
     

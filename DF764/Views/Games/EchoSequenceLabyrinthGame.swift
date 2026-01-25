@@ -373,6 +373,8 @@ struct EchoSequenceLabyrinthGame: View {
                     if collectibles.contains(point) && !collectedItems.contains(key) {
                         collectedItems.insert(key)
                         score += 50
+                        HapticsManager.shared.collectiblePickup()
+                        AudioManager.shared.playCollectible()
                     }
                     
                     if point == endPoint {
@@ -403,6 +405,8 @@ struct EchoSequenceLabyrinthGame: View {
     
     private func completeLevel() {
         gameState = .success
+        HapticsManager.shared.levelComplete()
+        AudioManager.shared.playLevelComplete()
         
         // Bonus for remaining time
         let timeBonus = Int(timeRemaining * 2)
@@ -411,6 +415,7 @@ struct EchoSequenceLabyrinthGame: View {
         // Bonus for collecting all items
         if collectedItems.count == collectibles.count && collectibles.count > 0 {
             score += 100
+            HapticsManager.shared.comboAchieved()
         }
         
         let stars = calculateStars()

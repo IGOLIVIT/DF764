@@ -11,6 +11,8 @@ struct LevelMapView: View {
     let gameType: GameType
     
     @State private var selectedLevel: Int?
+    @State private var showTutorial = false
+    @State private var showGameInfo = false
     
     var progress: GameProgressData {
         appState2.progress(for: gameType)
@@ -67,24 +69,20 @@ struct LevelMapView: View {
                     
                     Spacer()
                     
-                    // Shard counter
-                    HStack(spacing: 4) {
-                        Image(systemName: "diamond.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(Color("HighlightTone"))
-                        Text("\(appState2.shards)")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                    // Help button
+                    Button(action: { showTutorial = true }) {
+                        Image(systemName: "questionmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(gameType.themeColor.opacity(0.7))
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(Color.white.opacity(0.1))
-                    )
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
+                
+                // Game description card
+                GameDescriptionCard(gameType: gameType, progress: progress)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 8)
                 
                 // Level Grid
                 ScrollView(showsIndicators: false) {
@@ -110,7 +108,7 @@ struct LevelMapView: View {
                         }
                     }
                     .padding(.horizontal, 24)
-                    .padding(.vertical, 20)
+                    .padding(.vertical, 16)
                 }
             }
         }
@@ -123,6 +121,72 @@ struct LevelMapView: View {
                     .environmentObject(appState2)
             }
         }
+        .fullScreenCover(isPresented: $showTutorial) {
+            TutorialView(gameType: gameType)
+        }
+    }
+}
+
+struct GameDescriptionCard: View {
+    let gameType: GameType
+    let progress: GameProgressData
+    
+    var completionPercentage: Double {
+        Double(progress.completedLevelsCount) / Double(gameType.totalLevels)
+    }
+    
+    var body: some View {
+        HStack(spacing: 14) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(gameType.themeColor.opacity(0.2))
+                    .frame(width: 50, height: 50)
+                
+                Image(systemName: gameType.icon)
+                    .font(.system(size: 22))
+                    .foregroundColor(gameType.themeColor)
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(gameType.description)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundColor(Color.white.opacity(0.8))
+                    .lineLimit(1)
+                
+                // Progress bar
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.white.opacity(0.1))
+                        
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(gameType.themeColor)
+                            .frame(width: geometry.size.width * completionPercentage)
+                    }
+                }
+                .frame(height: 5)
+            }
+            
+            // Stats
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(progress.completedLevelsCount)/12")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                Text("\(Int(completionPercentage * 100))%")
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundColor(gameType.themeColor)
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(gameType.themeColor.opacity(0.2), lineWidth: 1)
+                )
+        )
     }
 }
 

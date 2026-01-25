@@ -309,6 +309,8 @@ struct GravityFluxGame: View {
         if gravityDirection != direction {
             gravityDirection = direction
             moves += 1
+            HapticsManager.shared.gravityChanged()
+            AudioManager.shared.playGravityChange()
         }
     }
     
@@ -407,6 +409,8 @@ struct GravityFluxGame: View {
                     collectibles[i].isCollected = true
                     collectedCount += 1
                     score += 50
+                    HapticsManager.shared.collectiblePickup()
+                    AudioManager.shared.playCollectible()
                 }
             }
         }
@@ -422,6 +426,8 @@ struct GravityFluxGame: View {
                 if let exitPortal = portals.first(where: { !$0.isEntry }) {
                     orbPosition = exitPortal.position
                     score += 10
+                    HapticsManager.shared.portalEntered()
+                    AudioManager.shared.playPortal()
                 }
             }
         }
@@ -438,6 +444,8 @@ struct GravityFluxGame: View {
     
     private func completeLevel() {
         gameState = .success
+        HapticsManager.shared.levelComplete()
+        AudioManager.shared.playLevelComplete()
         
         // Time bonus
         score += Int(timeRemaining * 2)
@@ -450,6 +458,7 @@ struct GravityFluxGame: View {
         // All collectibles bonus
         if collectedCount == collectibles.count {
             score += 150
+            HapticsManager.shared.comboAchieved()
         }
         
         let stars = calculateStars()

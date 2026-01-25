@@ -61,6 +61,13 @@ struct ProgressStatsView: View {
                         // Total shards card
                         TotalShardsCard(shards: appState2.shards)
                         
+                        // Player stats summary
+                        PlayerStatsSummary(
+                            profile: appState2.playerProfile,
+                            averageStars: appState2.averageStarsPerLevel,
+                            completionPercentage: appState2.overallCompletionPercentage
+                        )
+                        
                         // Overall stats
                         OverallStatsCard(
                             totalLevels: appState2.totalCompletedLevels,
@@ -85,6 +92,13 @@ struct ProgressStatsView: View {
                             }
                         }
                         
+                        // Achievements preview
+                        AchievementsPreview(
+                            unlockedCount: appState2.unlockedAchievementsCount,
+                            totalCount: AchievementType.allCases.count,
+                            recentAchievements: appState2.achievements.filter { $0.isUnlocked }.suffix(3).reversed().map { $0 }
+                        )
+                        
                         Spacer(minLength: 40)
                     }
                     .padding(.horizontal, 20)
@@ -92,6 +106,160 @@ struct ProgressStatsView: View {
                 }
             }
         }
+    }
+}
+
+struct PlayerStatsSummary: View {
+    let profile: PlayerProfile
+    let averageStars: Double
+    let completionPercentage: Double
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            // Games played
+            StatSummaryItem(
+                value: "\(profile.gamesPlayed)",
+                label: "Games",
+                icon: "gamecontroller.fill",
+                color: Color.blue
+            )
+            
+            Divider()
+                .frame(height: 40)
+                .background(Color.white.opacity(0.1))
+            
+            // Play time
+            StatSummaryItem(
+                value: profile.formattedPlayTime,
+                label: "Play Time",
+                icon: "clock.fill",
+                color: Color.green
+            )
+            
+            Divider()
+                .frame(height: 40)
+                .background(Color.white.opacity(0.1))
+            
+            // Average stars
+            StatSummaryItem(
+                value: String(format: "%.1f", averageStars),
+                label: "Avg Stars",
+                icon: "star.fill",
+                color: Color("HighlightTone")
+            )
+            
+            Divider()
+                .frame(height: 40)
+                .background(Color.white.opacity(0.1))
+            
+            // Best combo
+            StatSummaryItem(
+                value: "\(profile.bestCombo)x",
+                label: "Best Combo",
+                icon: "sparkles",
+                color: Color.pink
+            )
+        }
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
+    }
+}
+
+struct StatSummaryItem: View {
+    let value: String
+    let label: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+                    .foregroundColor(color)
+                Text(value)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+            }
+            Text(label)
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .foregroundColor(Color.white.opacity(0.5))
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+struct AchievementsPreview: View {
+    let unlockedCount: Int
+    let totalCount: Int
+    let recentAchievements: [Achievement]
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Text("Achievements")
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                Text("\(unlockedCount)/\(totalCount)")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundColor(Color("HighlightTone"))
+            }
+            
+            if recentAchievements.isEmpty {
+                HStack {
+                    Image(systemName: "trophy")
+                        .font(.system(size: 24))
+                        .foregroundColor(Color.white.opacity(0.3))
+                    
+                    Text("Complete levels to unlock achievements!")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundColor(Color.white.opacity(0.5))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+            } else {
+                HStack(spacing: 12) {
+                    ForEach(recentAchievements) { achievement in
+                        VStack(spacing: 8) {
+                            ZStack {
+                                Circle()
+                                    .fill(achievement.type.color.opacity(0.2))
+                                    .frame(width: 50, height: 50)
+                                
+                                Image(systemName: achievement.type.icon)
+                                    .font(.system(size: 22))
+                                    .foregroundColor(achievement.type.color)
+                            }
+                            
+                            Text(achievement.type.title)
+                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                .foregroundColor(Color.white.opacity(0.7))
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color("HighlightTone").opacity(0.15), lineWidth: 1)
+                )
+        )
     }
 }
 

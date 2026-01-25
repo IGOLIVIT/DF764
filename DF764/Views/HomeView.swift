@@ -10,6 +10,11 @@ struct HomeView: View {
     @State private var selectedGame: GameType?
     @State private var showSettings = false
     @State private var showStats = false
+    @State private var showAchievements = false
+    @State private var showDailyChallenge = false
+    @State private var showProfile = false
+    @State private var showShop = false
+    @State private var animateDailyGlow = false
     
     var body: some View {
         NavigationStack {
@@ -37,42 +42,115 @@ struct HomeView: View {
                 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
-                        // Header
+                        // Header with profile
                         HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Shifting Horizons")
-                                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
-                                
-                                Text("Choose your challenge")
-                                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                                    .foregroundColor(Color("HighlightTone").opacity(0.7))
+                            // Profile button
+                            Button(action: { showProfile = true }) {
+                                HStack(spacing: 10) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(appState2.playerProfile.rankColor.opacity(0.2))
+                                            .frame(width: 40, height: 40)
+                                        
+                                        Image(systemName: PlayerProfile.avatarOptions[appState2.playerProfile.avatarIndex])
+                                            .font(.system(size: 18))
+                                            .foregroundColor(appState2.playerProfile.rankColor)
+                                    }
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(appState2.playerProfile.username)
+                                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                                            .foregroundColor(.white)
+                                        
+                                        Text(appState2.playerProfile.playerRank)
+                                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                                            .foregroundColor(appState2.playerProfile.rankColor)
+                                    }
+                                }
                             }
                             
                             Spacer()
                             
-                            // Shard counter
-                            HStack(spacing: 6) {
-                                Image(systemName: "diamond.fill")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(Color("HighlightTone"))
-                                Text("\(appState2.shards)")
-                                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
+                            // Shard counter with shop access
+                            Button(action: { showShop = true }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "diamond.fill")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(Color("HighlightTone"))
+                                    Text("\(appState2.shards)")
+                                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                                        .foregroundColor(.white)
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(Color("HighlightTone").opacity(0.6))
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.white.opacity(0.1))
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(Color("HighlightTone").opacity(0.3), lineWidth: 1)
+                                        )
+                                )
                             }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule()
-                                    .fill(Color.white.opacity(0.1))
-                                    .overlay(
-                                        Capsule()
-                                            .stroke(Color("HighlightTone").opacity(0.3), lineWidth: 1)
-                                    )
-                            )
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 16)
+                        
+                        // App title
+                        VStack(spacing: 4) {
+                            Text("Shifting Horizons")
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                            
+                            Text("Choose your challenge")
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                .foregroundColor(Color("HighlightTone").opacity(0.7))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 20)
+                        
+                        // Daily Challenge Banner
+                        DailyChallengeBanner(
+                            challenge: appState2.todaysDailyChallenge,
+                            streak: appState2.playerProfile.consecutiveDays,
+                            animateGlow: animateDailyGlow,
+                            onTap: { showDailyChallenge = true }
+                        )
+                        .padding(.horizontal, 20)
+                        
+                        // Quick Actions Row
+                        HStack(spacing: 12) {
+                            QuickActionButton(
+                                icon: "trophy.fill",
+                                title: "Achievements",
+                                badge: appState2.unlockedAchievementsCount > 0 ? "\(appState2.unlockedAchievementsCount)" : nil,
+                                color: Color("HighlightTone")
+                            ) {
+                                showAchievements = true
+                            }
+                            
+                            QuickActionButton(
+                                icon: "chart.bar.fill",
+                                title: "Statistics",
+                                badge: nil,
+                                color: Color("AccentGlow")
+                            ) {
+                                showStats = true
+                            }
+                            
+                            QuickActionButton(
+                                icon: "gearshape.fill",
+                                title: "Settings",
+                                badge: nil,
+                                color: Color.gray
+                            ) {
+                                showSettings = true
+                            }
+                        }
+                        .padding(.horizontal, 20)
                         
                         // Progress summary
                         ProgressSummaryCard(
@@ -85,10 +163,18 @@ struct HomeView: View {
                         
                         // Games section
                         VStack(alignment: .leading, spacing: 16) {
-                            Text("Mini-Games")
-                                .font(.system(size: 20, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 20)
+                            HStack {
+                                Text("Mini-Games")
+                                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
+                                
+                                Spacer()
+                                
+                                Text("\(GameType.allCases.count) games")
+                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                    .foregroundColor(Color("HighlightTone").opacity(0.6))
+                            }
+                            .padding(.horizontal, 20)
                             
                             ForEach(GameType.allCases, id: \.self) { gameType in
                                 GameCardNew(
@@ -106,23 +192,18 @@ struct HomeView: View {
                         }
                         .padding(.top, 8)
                         
-                        // Bottom buttons
-                        VStack(spacing: 12) {
-                            GlowingButton(title: "Statistics", action: {
-                                showStats = true
-                            }, isSecondary: true)
-                            
-                            GlowingButton(title: "Settings", action: {
-                                showSettings = true
-                            }, isSecondary: true)
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 16)
-                        .padding(.bottom, 40)
+                        Spacer(minLength: 40)
                     }
                 }
             }
             .navigationBarHidden(true)
+            .onAppear {
+                appState2.ensureTodaysDailyChallenge()
+                // Start animation after a small delay to avoid layout issues
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    animateDailyGlow = true
+                }
+            }
             .fullScreenCover(item: $selectedGame) { gameType in
                 LevelMapView(gameType: gameType)
                     .environmentObject(appState2)
@@ -135,7 +216,169 @@ struct HomeView: View {
                 SettingsView()
                     .environmentObject(appState2)
             }
+            .fullScreenCover(isPresented: $showAchievements) {
+                AchievementsView()
+                    .environmentObject(appState2)
+            }
+            .fullScreenCover(isPresented: $showDailyChallenge) {
+                DailyChallengeView()
+                    .environmentObject(appState2)
+            }
+            .fullScreenCover(isPresented: $showProfile) {
+                PlayerProfileView()
+                    .environmentObject(appState2)
+            }
+            .fullScreenCover(isPresented: $showShop) {
+                ShopView()
+                    .environmentObject(appState2)
+            }
         }
+    }
+}
+
+// MARK: - Daily Challenge Banner
+struct DailyChallengeBanner: View {
+    let challenge: DailyChallenge?
+    let streak: Int
+    let animateGlow: Bool
+    let onTap: () -> Void
+    
+    @State private var isPulsing = false
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 16) {
+                // Icon with local animation
+                ZStack {
+                    Circle()
+                        .fill(Color.orange.opacity(isPulsing ? 0.3 : 0.2))
+                        .frame(width: 50, height: 50)
+                        .scaleEffect(isPulsing ? 1.05 : 1.0)
+                        .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: isPulsing)
+                    
+                    Image(systemName: "sun.max.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(.orange)
+                }
+                .onAppear {
+                    if animateGlow {
+                        isPulsing = true
+                    }
+                }
+                .onChange(of: animateGlow) { newValue in
+                    isPulsing = newValue
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text("Daily Challenge")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        if let ch = challenge, ch.isCompleted {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(.green)
+                        }
+                    }
+                    
+                    if let ch = challenge {
+                        Text("\(ch.gameType.rawValue) - Level \(ch.targetLevel)")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundColor(Color.white.opacity(0.6))
+                    }
+                }
+                
+                Spacer()
+                
+                // Streak badge
+                if streak > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.orange)
+                        Text("\(streak)")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule()
+                            .fill(Color.orange.opacity(0.2))
+                    )
+                }
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14))
+                    .foregroundColor(Color.white.opacity(0.4))
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [Color.orange.opacity(0.4), Color("HighlightTone").opacity(0.2)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Quick Action Button
+struct QuickActionButton: View {
+    let icon: String
+    let title: String
+    let badge: String?
+    let color: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                ZStack(alignment: .topTrailing) {
+                    ZStack {
+                        Circle()
+                            .fill(color.opacity(0.15))
+                            .frame(width: 44, height: 44)
+                        
+                        Image(systemName: icon)
+                            .font(.system(size: 18))
+                            .foregroundColor(color)
+                    }
+                    
+                    if let badge = badge {
+                        Text(badge)
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .padding(4)
+                            .background(Circle().fill(color))
+                            .offset(x: 4, y: -4)
+                    }
+                }
+                
+                Text(title)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundColor(Color.white.opacity(0.7))
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.white.opacity(0.05))
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
